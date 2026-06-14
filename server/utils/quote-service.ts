@@ -1,4 +1,4 @@
-import type { QuoteSnapshot } from '#shared/types'
+import type { Candle, HistoryRange, QuoteSnapshot } from '#shared/types'
 import YahooFinance from 'yahoo-finance2'
 
 // 单例客户端：内置并发队列、抑制问卷提示、关闭 schema 校验抛错
@@ -100,6 +100,49 @@ export async function fetchQuote(symbol: string): Promise<QuoteResult> {
     currency: q.currency ?? null,
   }
   return { snapshot, meta, raw: q }
+}
+
+/** 区间起始时间：从当前时间回溯对应跨度 */
+function rangeStart(range: HistoryRange): Date {
+  const now = new Date()
+  const d = new Date(now)
+  switch (range) {
+    case '1M':
+      d.setMonth(d.getMonth() - 1)
+      break
+    case '3M':
+      d.setMonth(d.getMonth() - 3)
+      break
+    case '6M':
+      d.setMonth(d.getMonth() - 6)
+      break
+    case '1Y':
+      d.setFullYear(d.getFullYear() - 1)
+      break
+  }
+  return d
+}
+
+/** yyyy-mm-dd（UTC），lightweight-charts 日线 time 要求 */
+function toDateString(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+/** 获取单只股票的历史 OHLC（日线），用于个股详情 K 线图 */
+export async function fetchHistory(symbol: string, range: HistoryRange): Promise<Candle[]> {
+  const sym = symbol.trim().toUpperCase()
+  const chart = await yf.chart(sym, { period1: rangeStart(range), interval: '1d' })
+  const candles: Candle[] = []
+  for (const q of chart.quotes) {
+    const open = num(q.open)
+    const high = num(q.high)
+    const low = num(q.low)
+    const close = num(q.close)
+    if (open == null || high == null || low == null || close == null || !q.date)
+      continue
+    candles.push({ time: toDateString(new Date(q.date)), open, high, low, close })
+  }
+  return candles
 }
 
 /**

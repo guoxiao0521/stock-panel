@@ -57,8 +57,28 @@ export interface MacroMetricSnapshot {
   value: number | null
   change: number | null
   changePercent: number | null
+  /** 近 5 个交易日收盘价序列，用于短期趋势 sparkline */
+  spark: number[] | null
   quoteTime: string | null
+  /** 最近一次成功拉取时间（失败刷新不更新此字段） */
   fetchedAt: string | null
+  error: string | null
+  /** 最近一次刷新失败的时间，便于区分“数据新鲜”与“刷新失败” */
+  errorAt: string | null
+}
+
+/** 历史走势区间（个股详情 K 线图） */
+export type HistoryRange = '1M' | '3M' | '6M' | '1Y'
+
+export const HISTORY_RANGES: HistoryRange[] = ['1M', '3M', '6M', '1Y']
+
+/** 单根 K 线（OHLC），time 为 yyyy-mm-dd（交易日） */
+export interface Candle {
+  time: string
+  open: number
+  high: number
+  low: number
+  close: number
 }
 
 /** 排序方式 */

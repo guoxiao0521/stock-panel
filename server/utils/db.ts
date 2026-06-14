@@ -59,12 +59,24 @@ CREATE TABLE IF NOT EXISTS macro_metric_snapshots (
   change_percent  REAL,
   quote_time      TEXT,
   fetched_at      TEXT,
+  error           TEXT,
+  error_at        TEXT,
   raw_json        TEXT
 );
 `
 
+/** 幂等添加列，兼容更早版本已创建的表结构 */
+function ensureColumn(database: DatabaseType, table: string, column: string, ddl: string) {
+  const cols = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  if (!cols.some(c => c.name === column))
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+}
+
 function initSchema(database: DatabaseType) {
   database.exec(SCHEMA)
+  // 迁移：早期 macro_metric_snapshots 无 error / error_at 列
+  ensureColumn(database, 'macro_metric_snapshots', 'error', 'error TEXT')
+  ensureColumn(database, 'macro_metric_snapshots', 'error_at', 'error_at TEXT')
   // 初始化默认列表
   const now = new Date().toISOString()
   database

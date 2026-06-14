@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { WatchlistRow } from '#shared/types'
+import type { Candle, HistoryRange, WatchlistRow } from '#shared/types'
+import { HISTORY_RANGES } from '#shared/types'
 import { Trash2Icon, XIcon } from '@lucide/vue'
 import { ref, watch } from 'vue'
+import PriceChart from '@/components/PriceChart.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +46,51 @@ watch(
   (row) => {
     note.value = row?.note ?? ''
     tags.value = row ? [...row.tags] : []
+  },
+  { immediate: true },
+)
+
+// 历史 K 线图
+const range = ref<HistoryRange>('6M')
+const candles = ref<Candle[]>([])
+const chartLoading = ref(false)
+const chartError = ref<string | null>(null)
+let historyToken = 0
+
+async function loadHistory() {
+  const symbol = props.row?.symbol
+  if (!symbol || !open.value)
+    return
+  const token = ++historyToken
+  chartLoading.value = true
+  chartError.value = null
+  try {
+    const data = await $fetch('/api/quotes/history', {
+      query: { symbol, range: range.value },
+    })
+    // 丢弃过期请求（快速切换 symbol/区间时）
+    if (token !== historyToken)
+      return
+    candles.value = data.candles as Candle[]
+  }
+  catch {
+    if (token !== historyToken)
+      return
+    candles.value = []
+    chartError.value = '历史数据加载失败'
+  }
+  finally {
+    if (token === historyToken)
+      chartLoading.value = false
+  }
+}
+
+// 打开、切换股票或切换区间时加载
+watch(
+  [() => props.row?.symbol, range, open],
+  () => {
+    if (open.value && props.row)
+      loadHistory()
   },
   { immediate: true },
 )
@@ -107,6 +154,48 @@ const metrics = computed(() => {
             <p class="mt-1 font-medium tabular-nums" :class="m.tone !== undefined ? changeColorClass(m.tone) : ''">
               {{ m.value }}
             </p>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-medium">历史走势</label>
+            <div class="flex gap-1">
+              <Button
+                v-for="r in HISTORY_RANGES"
+                :key="r"
+                :variant="range === r ? 'secondary' : 'ghost'"
+                size="sm"
+                class="h-7 px-2 text-xs"
+                @click="range = r"
+              >
+                {{ r }}
+              </Button>
+            </div>
+          </div>
+          <div class="relative rounded-lg border bg-muted/20">
+            <ClientOnly>
+              <PriceChart v-if="candles.length > 0" :candles="candles" />
+              <div
+                v-else
+                class="flex h-64 items-center justify-center text-sm text-muted-foreground"
+              >
+                {{ chartLoading ? '加载中…' : chartError ?? '暂无历史数据' }}
+              </div>
+              <template #fallback>
+                <div class="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                  加载中…
+                </div>
+              </template>
+            </ClientOnly>
+            <div
+              v-if="chartLoading && candles.length > 0"
+              class="absolute right-2 top-2 text-xs text-muted-foreground"
+            >
+              更新中…
+            </div>
           </div>
         </div>
 

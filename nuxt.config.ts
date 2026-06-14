@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  css: ['~/assets/css/tailwind.css'],
+  css: ['~/assets/css/tailwind.css', 'vue-sonner/style.css'],
   runtimeConfig: {
     // SQLite 数据库文件路径，可用 NUXT_DB_PATH 覆盖
     dbPath: './.data/stock-panel.db',
