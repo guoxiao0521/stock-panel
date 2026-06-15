@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Candle } from '#shared/types'
 import type { CandlestickData, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts'
-import { useColorMode } from '@vueuse/core'
 import { onBeforeUnmount, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
 import { computeSMA } from '@/lib/indicators'
 
@@ -21,7 +20,7 @@ const container = useTemplateRef<HTMLDivElement>('container')
 const chart = shallowRef<IChartApi | null>(null)
 const candleSeries = shallowRef<ISeriesApi<'Candlestick'> | null>(null)
 const maSeries = new Map<number, ISeriesApi<'Line'>>()
-const mode = useColorMode()
+let stopThemeObserver: (() => void) | null = null
 
 // 图例可见性（点击切换显示/隐藏对应均线）
 const visible = reactive<Record<number, boolean>>(
@@ -71,6 +70,10 @@ function toggleMa(period: number) {
   maSeries.get(period)?.applyOptions({ visible: visible[period] })
 }
 
+function applyTheme() {
+  chart.value?.applyOptions(themeOptions(isDark()))
+}
+
 onMounted(async () => {
   if (!container.value)
     return
@@ -100,15 +103,20 @@ onMounted(async () => {
   chart.value = c
   candleSeries.value = s
   applyData(props.candles)
+
+  const themeObserver = new MutationObserver(applyTheme)
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  })
+  stopThemeObserver = () => themeObserver.disconnect()
 })
 
 watch(() => props.candles, candles => applyData(candles))
 
-watch(mode, () => {
-  chart.value?.applyOptions(themeOptions(isDark()))
-})
-
 onBeforeUnmount(() => {
+  stopThemeObserver?.()
+  stopThemeObserver = null
   chart.value?.remove()
   chart.value = null
   candleSeries.value = null
