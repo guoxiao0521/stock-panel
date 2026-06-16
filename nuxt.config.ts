@@ -8,6 +8,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // SQLite 数据库文件路径，可用 NUXT_DB_PATH 覆盖
     dbPath: './.data/stock-panel.db',
+    // Phase 3：AI 分析 provider（当前默认 template，无需 API key）
+    analysisProvider: 'template',
+    analysisApiKey: '',
+    analysisModel: '',
   },
   vite: {
     plugins: [tailwindcss()],

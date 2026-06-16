@@ -120,3 +120,141 @@ export interface UpdateWatchlistItemBody {
   tags?: string[]
   sortOrder?: number
 }
+
+// Phase 3：AI 分析契约（映射 finance-skills 方法论，输出统一报告结构）
+
+/** 内置分析 skill，对应 finance-skills 子集 */
+export type AnalysisSkillId = 'overview' | 'sepa' | 'earningsPreview' | 'liquidity'
+
+export interface AnalysisSkillOption {
+  value: AnalysisSkillId
+  label: string
+  description: string
+  /** finance-skills 源 skill 名称 */
+  sourceSkill: string
+}
+
+export const ANALYSIS_SKILLS: AnalysisSkillOption[] = [
+  {
+    value: 'overview',
+    label: '综合概览',
+    description: '行情、技术位、宏观背景与用户备注的综合观察。',
+    sourceSkill: 'yfinance-data',
+  },
+  {
+    value: 'sepa',
+    label: 'SEPA 趋势',
+    description: 'Minervini 趋势模板、阶段判断与关键技术条件检查。',
+    sourceSkill: 'sepa-strategy',
+  },
+  {
+    value: 'earningsPreview',
+    label: '财报预览',
+    description: '财报前共识预期与历史 beat/miss（需更多财务数据）。',
+    sourceSkill: 'earnings-preview',
+  },
+  {
+    value: 'liquidity',
+    label: '流动性',
+    description: '成交量、换手率与流动性相关指标观察。',
+    sourceSkill: 'stock-liquidity',
+  },
+]
+
+export const ANALYSIS_SKILL_IDS: AnalysisSkillId[] = ANALYSIS_SKILLS.map(s => s.value)
+
+export const ANALYSIS_DISCLAIMER
+  = '本报告由自动化分析生成，仅供个人研究参考，不构成投资建议。数据可能延迟、缺失或不准确，请自行核实。'
+
+export interface RunAnalysisBody {
+  symbol: string
+  skillId: AnalysisSkillId
+  range?: HistoryRange
+  /** 默认 true；设为 false 时允许使用本地缓存行情 */
+  forceRefresh?: boolean
+}
+
+export interface AnalysisMetric {
+  label: string
+  value: string
+  detail?: string
+}
+
+export interface AnalysisChecklistItem {
+  label: string
+  /** null 表示数据不足，无法判断 */
+  pass: boolean | null
+  detail?: string
+}
+
+export type AnalysisSectionKind = 'text' | 'metrics' | 'checklist' | 'list'
+
+export interface AnalysisSection {
+  title: string
+  kind: AnalysisSectionKind
+  content?: string
+  metrics?: AnalysisMetric[]
+  checklist?: AnalysisChecklistItem[]
+  items?: string[]
+}
+
+export interface AnalysisTechnicalSummary {
+  price: number | null
+  ma50: number | null
+  ma150: number | null
+  ma200: number | null
+  ma200Rising: boolean | null
+  week52High: number | null
+  week52Low: number | null
+  pctFrom52WeekHigh: number | null
+  pctAbove52WeekLow: number | null
+  avgVolume20: number | null
+  volumeRatio: number | null
+  supportLevel: number | null
+  resistanceLevel: number | null
+}
+
+export interface AnalysisMarketContext {
+  volatility: string
+  riskAppetite: string
+  breadth: string
+}
+
+export interface AnalysisInputContext {
+  symbol: string
+  skillId: AnalysisSkillId
+  range: HistoryRange
+  companyName: string | null
+  quote: QuoteSnapshot | null
+  candles: Candle[]
+  technical: AnalysisTechnicalSummary
+  macroMetrics: MacroMetricSnapshot[]
+  marketContext: AnalysisMarketContext
+  watchlistNote: string | null
+  watchlistTags: string[]
+  dataGaps: string[]
+}
+
+export interface AnalysisReportMeta {
+  provider: string
+  model: string | null
+  skillSource: string
+}
+
+export interface AnalysisReport {
+  id: string
+  symbol: string
+  skillId: AnalysisSkillId
+  title: string
+  summary: string
+  sections: AnalysisSection[]
+  riskFlags: string[]
+  dataGaps: string[]
+  disclaimer: string
+  createdAt: string
+  meta: AnalysisReportMeta
+}
+
+export interface RunAnalysisResponse {
+  report: AnalysisReport
+}
