@@ -1,5 +1,13 @@
-import type { RunAnalysisBody, RunAnalysisResponse } from '#shared/types'
+import type { AnalysisSkillId, HistoryRange, RunAnalysisBody, RunAnalysisResponse } from '#shared/types'
 import { ANALYSIS_SKILL_IDS, HISTORY_RANGES } from '#shared/types'
+
+function isAnalysisSkillId(value: string): value is AnalysisSkillId {
+  return ANALYSIS_SKILL_IDS.includes(value as AnalysisSkillId)
+}
+
+function isHistoryRange(value: string): value is HistoryRange {
+  return HISTORY_RANGES.includes(value as HistoryRange)
+}
 
 /** POST /api/analysis/run — 触发个股 AI 分析（模板 runner） */
 export default defineEventHandler(async (event) => {
@@ -16,12 +24,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'skillId is required' })
   }
 
-  if (typeof body.skillId !== 'string' || !ANALYSIS_SKILL_IDS.includes(body.skillId as RunAnalysisBody['skillId'])) {
+  if (typeof body.skillId !== 'string' || !isAnalysisSkillId(body.skillId)) {
     throw createError({ statusCode: 400, statusMessage: 'unknown skillId' })
   }
 
-  if (body.range != null && (typeof body.range !== 'string' || !HISTORY_RANGES.includes(body.range as RunAnalysisBody['range']))) {
-    throw createError({ statusCode: 400, statusMessage: 'unknown range' })
+  let range: HistoryRange = '1Y'
+  if (body.range != null) {
+    if (typeof body.range !== 'string' || !isHistoryRange(body.range)) {
+      throw createError({ statusCode: 400, statusMessage: 'unknown range' })
+    }
+    range = body.range
   }
 
   if (body.forceRefresh != null && typeof body.forceRefresh !== 'boolean') {
@@ -30,8 +42,8 @@ export default defineEventHandler(async (event) => {
 
   const analysisBody: RunAnalysisBody = {
     symbol: body.symbol.trim().toUpperCase(),
-    skillId: body.skillId as RunAnalysisBody['skillId'],
-    range: (body.range ?? '1Y') as RunAnalysisBody['range'],
+    skillId: body.skillId,
+    range,
     forceRefresh: body.forceRefresh !== false,
   }
 

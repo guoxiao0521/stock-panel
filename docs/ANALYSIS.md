@@ -71,7 +71,7 @@ npx plugins add himself65/finance-skills --plugin finance-market-analysis
 
 错误：
 
-- `400`：缺少 symbol / skillId，或未知 skillId
+- `400`：缺少 symbol / skillId，未知 skillId / range，或 forceRefresh 类型错误
 - `404`：symbol 不存在
 - `500`：分析失败
 
