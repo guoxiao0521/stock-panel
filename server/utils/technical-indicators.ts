@@ -16,6 +16,25 @@ function latestSMA(candles: Candle[], period: number): number | null {
   return computeSMAAt(candles, period, candles.length - 1)
 }
 
+function latestVolume(candles: Candle[]): number | null {
+  for (let i = candles.length - 1; i >= 0; i--) {
+    const volume = candles[i]!.volume
+    if (volume != null && volume > 0)
+      return volume
+  }
+  return null
+}
+
+function averageRecentVolume(candles: Candle[], days: number): number | null {
+  const volumes = candles
+    .slice(-days)
+    .map(c => c.volume)
+    .filter((v): v is number => v != null && v > 0)
+  if (volumes.length < days)
+    return null
+  return volumes.reduce((sum, v) => sum + v, 0) / volumes.length
+}
+
 /** 近 N 个交易日的最高/最低，用于支撑/压力与 52 周区间近似 */
 function recentRange(candles: Candle[], days: number): { high: number | null, low: number | null } {
   const slice = candles.slice(-days)
@@ -58,6 +77,13 @@ export function computeTechnicalSummary(
   const recent20 = recentRange(candles, 20)
   const supportLevel = recent20.low
   const resistanceLevel = recent20.high
+  const avgVolume20 = averageRecentVolume(candles, 20)
+  const comparisonVolume = dailyVolume != null && dailyVolume > 0
+    ? dailyVolume
+    : latestVolume(candles)
+  const volumeRatio = avgVolume20 != null && comparisonVolume != null && avgVolume20 > 0
+    ? comparisonVolume / avgVolume20
+    : null
 
   return {
     price,
@@ -69,8 +95,8 @@ export function computeTechnicalSummary(
     week52Low,
     pctFrom52WeekHigh,
     pctAbove52WeekLow,
-    avgVolume20: null,
-    volumeRatio: null,
+    avgVolume20,
+    volumeRatio,
     supportLevel,
     resistanceLevel,
   }

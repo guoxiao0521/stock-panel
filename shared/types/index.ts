@@ -79,6 +79,7 @@ export interface Candle {
   high: number
   low: number
   close: number
+  volume: number | null
 }
 
 /** 排序方式 */
@@ -214,6 +215,13 @@ export interface AnalysisTechnicalSummary {
   resistanceLevel: number | null
 }
 
+export interface AnalysisRelativeStrengthSummary {
+  benchmarkSymbol: string
+  excessReturn3M: number | null
+  excessReturn6M: number | null
+  excessReturn1Y: number | null
+}
+
 export interface AnalysisMarketContext {
   volatility: string
   riskAppetite: string
@@ -228,6 +236,7 @@ export interface AnalysisInputContext {
   quote: QuoteSnapshot | null
   candles: Candle[]
   technical: AnalysisTechnicalSummary
+  relativeStrength: AnalysisRelativeStrengthSummary
   macroMetrics: MacroMetricSnapshot[]
   marketContext: AnalysisMarketContext
   watchlistNote: string | null
