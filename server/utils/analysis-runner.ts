@@ -1,6 +1,7 @@
 import type {
   AnalysisChecklistItem,
   AnalysisInputContext,
+  AnalysisMetric,
   AnalysisReport,
   AnalysisSection,
   AnalysisSkillId,
@@ -42,8 +43,31 @@ function fmtMultiple(v: number | null): string {
   return `${v.toFixed(2)}x`
 }
 
+function fmtRange(low: number, high: number): string {
+  if (Number.isNaN(low) || Number.isNaN(high))
+    return '-'
+  if (Math.abs(low - high) < 0.005)
+    return fmtNum(low)
+  return `${fmtNum(low)} - ${fmtNum(high)}`
+}
+
 function skillSource(skillId: AnalysisSkillId): string {
   return ANALYSIS_SKILLS.find(s => s.value === skillId)?.sourceSkill ?? skillId
+}
+
+function technicalSupportMetrics(ctx: AnalysisInputContext): AnalysisMetric[] {
+  const supports = ctx.technical.supportLevels
+  if (supports.length === 0) {
+    return [
+      { label: '技术支撑', value: '-', detail: '历史数据不足，暂无法生成均线支撑区' },
+    ]
+  }
+
+  return supports.map(level => ({
+    label: level.label,
+    value: fmtRange(level.rangeLow, level.rangeHigh),
+    detail: level.basis,
+  }))
 }
 
 function relativeStrengthPass(ctx: AnalysisInputContext): boolean | null {
@@ -157,12 +181,15 @@ function buildOverviewReport(ctx: AnalysisInputContext): AnalysisReport {
       title: '技术位',
       kind: 'metrics',
       metrics: [
+        { label: 'MA5', value: fmtNum(t.ma5) },
+        { label: 'MA10', value: fmtNum(t.ma10) },
+        { label: 'MA20', value: fmtNum(t.ma20) },
         { label: 'MA50', value: fmtNum(t.ma50) },
         { label: 'MA150', value: fmtNum(t.ma150) },
         { label: 'MA200', value: fmtNum(t.ma200) },
         { label: '52 周高', value: fmtNum(t.week52High) },
         { label: '52 周低', value: fmtNum(t.week52Low) },
-        { label: '近 20 日支撑', value: fmtNum(t.supportLevel) },
+        ...technicalSupportMetrics(ctx),
         { label: '近 20 日压力', value: fmtNum(t.resistanceLevel) },
       ],
     },

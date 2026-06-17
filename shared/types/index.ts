@@ -199,8 +199,19 @@ export interface AnalysisSection {
   items?: string[]
 }
 
+export interface TechnicalSupportLevel {
+  label: string
+  price: number
+  rangeLow: number
+  rangeHigh: number
+  basis: string
+}
+
 export interface AnalysisTechnicalSummary {
   price: number | null
+  ma5: number | null
+  ma10: number | null
+  ma20: number | null
   ma50: number | null
   ma150: number | null
   ma200: number | null
@@ -212,6 +223,7 @@ export interface AnalysisTechnicalSummary {
   avgVolume20: number | null
   volumeRatio: number | null
   supportLevel: number | null
+  supportLevels: TechnicalSupportLevel[]
   resistanceLevel: number | null
 }
 
