@@ -86,10 +86,16 @@ function fmtLevel(v: number): string {
 
 function levelLabel(index: number): string {
   if (index === 0)
-    return '强支撑 S1'
+    return '近端支撑 S1'
   if (index === 1)
     return '重要支撑 S2'
   return '中期支撑 S3'
+}
+
+function clusterWouldExceedSpan(values: number[], nextValue: number, threshold: number): boolean {
+  const high = Math.max(...values, nextValue)
+  const low = Math.min(...values, nextValue)
+  return high - low > threshold
 }
 
 function clusterMovingAverages(
@@ -107,7 +113,12 @@ function clusterMovingAverages(
   for (const candidate of candidates) {
     const last = clusters[clusters.length - 1]
     const lastValue = last?.values[last.values.length - 1]
-    if (last && lastValue != null && Math.abs(lastValue - candidate.value) <= threshold) {
+    if (
+      last
+      && lastValue != null
+      && Math.abs(lastValue - candidate.value) <= threshold
+      && !clusterWouldExceedSpan(last.values, candidate.value, threshold)
+    ) {
       last.names.push(candidate.name)
       last.values.push(candidate.value)
     }
@@ -123,6 +134,10 @@ function recentSupportPrices(candles: Candle[], days: number): number[] {
     .slice(-days)
     .flatMap(c => [c.low, c.close])
     .filter(v => Number.isFinite(v))
+}
+
+function nearbySupportPricesBelow(anchor: number, prices: number[], threshold: number): number[] {
+  return prices.filter(v => v <= anchor && anchor - v <= threshold)
 }
 
 function distinctSorted(values: number[], minDistance: number): number[] {
@@ -141,7 +156,13 @@ function clusterPriceTouches(touches: PriceTouch[], threshold: number): PriceTou
   for (const touch of sorted) {
     const last = clusters[clusters.length - 1]
     const lastValue = last?.[last.length - 1]?.value
-    if (last && lastValue != null && Math.abs(lastValue - touch.value) <= threshold)
+    const lastValues = last?.map(item => item.value) ?? []
+    if (
+      last
+      && lastValue != null
+      && Math.abs(lastValue - touch.value) <= threshold
+      && !clusterWouldExceedSpan(lastValues, touch.value, threshold)
+    )
       last.push(touch)
     else
       clusters.push([touch])
@@ -209,7 +230,6 @@ function buildTechnicalSupportLevels(
 
   const atr14 = averageTrueRange(candles, 14)
   const clusterThreshold = Math.max(price * 0.025, (atr14 ?? 0) * 0.5)
-  const extendThreshold = Math.max(price * 0.04, (atr14 ?? 0) * 0.75)
   const nearbyPrices = recentSupportPrices(candles, 20)
 
   const priceActionLevel = priceActionSupportLevel(candles, price, atr14, entries, 0)
@@ -223,7 +243,7 @@ function buildTechnicalSupportLevels(
     .map((cluster, index) => {
       const anchor = Math.max(...cluster.values)
       const maLow = Math.min(...cluster.values)
-      const nearby = nearbyPrices.filter(v => v <= anchor && Math.abs(v - anchor) <= extendThreshold)
+      const nearby = nearbySupportPricesBelow(anchor, nearbyPrices, clusterThreshold)
       const rangeLow = Math.min(maLow, ...(nearby.length > 0 ? nearby : [maLow]))
       const rangeHigh = anchor
       const names = cluster.names.join('/')
@@ -254,7 +274,7 @@ function buildTechnicalSupportLevels(
   for (const anchor of swingAnchors) {
     if (levels.length >= 3)
       break
-    const nearby = nearbyPrices.filter(v => v <= anchor && Math.abs(v - anchor) <= extendThreshold)
+    const nearby = nearbySupportPricesBelow(anchor, nearbyPrices, clusterThreshold)
     const rangeLow = Math.min(anchor, ...(nearby.length > 0 ? nearby : [anchor]))
     levels.push({
       label: levelLabel(levels.length),
