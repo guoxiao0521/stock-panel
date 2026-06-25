@@ -1,6 +1,7 @@
 import type {
   AnalysisChecklistItem,
   AnalysisInputContext,
+  AnalysisMetric,
   AnalysisReport,
   AnalysisSection,
   AnalysisSkillId,
@@ -27,8 +28,58 @@ function fmtPct(v: number | null): string {
   return `${sign}${v.toFixed(2)}%`
 }
 
+function fmtCompact(v: number | null): string {
+  if (v == null || Number.isNaN(v))
+    return '-'
+  return Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(v)
+}
+
+function fmtMultiple(v: number | null): string {
+  if (v == null || Number.isNaN(v))
+    return '-'
+  return `${v.toFixed(2)}x`
+}
+
+function fmtRange(low: number, high: number): string {
+  if (Number.isNaN(low) || Number.isNaN(high))
+    return '-'
+  if (Math.abs(low - high) < 0.005)
+    return fmtNum(low)
+  return `${fmtNum(low)} - ${fmtNum(high)}`
+}
+
 function skillSource(skillId: AnalysisSkillId): string {
   return ANALYSIS_SKILLS.find(s => s.value === skillId)?.sourceSkill ?? skillId
+}
+
+function technicalSupportMetrics(ctx: AnalysisInputContext): AnalysisMetric[] {
+  const supports = ctx.technical.supportLevels
+  if (supports.length === 0) {
+    return [
+      { label: '技术支撑', value: '-', detail: '历史数据不足，暂无法生成均线支撑区' },
+    ]
+  }
+
+  return supports.map(level => ({
+    label: level.label,
+    value: fmtRange(level.rangeLow, level.rangeHigh),
+    detail: level.basis,
+  }))
+}
+
+function relativeStrengthPass(ctx: AnalysisInputContext): boolean | null {
+  const rs = ctx.relativeStrength
+  if (rs.excessReturn6M == null || rs.excessReturn1Y == null)
+    return null
+  return rs.excessReturn6M > 0 && rs.excessReturn1Y > 0
+}
+
+function relativeStrengthDetail(ctx: AnalysisInputContext): string {
+  const rs = ctx.relativeStrength
+  return `相对 ${rs.benchmarkSymbol}：3M ${fmtPct(rs.excessReturn3M)} / 6M ${fmtPct(rs.excessReturn6M)} / 1Y ${fmtPct(rs.excessReturn1Y)}`
 }
 
 function buildSepaChecklist(ctx: AnalysisInputContext): AnalysisChecklistItem[] {
@@ -78,9 +129,9 @@ function buildSepaChecklist(ctx: AnalysisInputContext): AnalysisChecklistItem[] 
       detail: `距 52 周高点 ${fmtPct(t.pctFrom52WeekHigh)}`,
     },
     {
-      label: '相对强度 RS > 70 分位',
-      pass: null,
-      detail: '当前数据源未提供 RS 评级',
+      label: `相对 ${ctx.relativeStrength.benchmarkSymbol} 强度`,
+      pass: relativeStrengthPass(ctx),
+      detail: relativeStrengthPass(ctx) == null ? '相对强度数据不足' : relativeStrengthDetail(ctx),
     },
   ]
 }
@@ -121,18 +172,24 @@ function buildOverviewReport(ctx: AnalysisInputContext): AnalysisReport {
         { label: '年初至今', value: fmtPct(q?.ytdChangePercent ?? null) },
         { label: '市盈率 (TTM)', value: fmtNum(q?.trailingPe ?? null) },
         { label: '换手率', value: fmtPct(q?.turnoverRate ?? null) },
+        { label: '20 日均量', value: fmtCompact(t.avgVolume20) },
+        { label: '量能倍数', value: fmtMultiple(t.volumeRatio) },
+        { label: `相对 ${ctx.relativeStrength.benchmarkSymbol} 6M`, value: fmtPct(ctx.relativeStrength.excessReturn6M) },
       ],
     },
     {
       title: '技术位',
       kind: 'metrics',
       metrics: [
+        { label: 'MA5', value: fmtNum(t.ma5) },
+        { label: 'MA10', value: fmtNum(t.ma10) },
+        { label: 'MA20', value: fmtNum(t.ma20) },
         { label: 'MA50', value: fmtNum(t.ma50) },
         { label: 'MA150', value: fmtNum(t.ma150) },
         { label: 'MA200', value: fmtNum(t.ma200) },
         { label: '52 周高', value: fmtNum(t.week52High) },
         { label: '52 周低', value: fmtNum(t.week52Low) },
-        { label: '近 20 日支撑', value: fmtNum(t.supportLevel) },
+        ...technicalSupportMetrics(ctx),
         { label: '近 20 日压力', value: fmtNum(t.resistanceLevel) },
       ],
     },
@@ -182,8 +239,8 @@ function buildSepaReport(ctx: AnalysisInputContext): AnalysisReport {
   const { stage, verdict } = sepaStageVerdict(checklist)
   const name = ctx.companyName ?? ctx.symbol
   const gaps = [...ctx.dataGaps]
-  if (checklist.some(c => c.pass === null))
-    gaps.push('相对强度 (RS) 数据不可用')
+  if (relativeStrengthPass(ctx) == null && !gaps.includes('相对强度 benchmark 数据不可用'))
+    gaps.push('相对强度数据不足')
   const riskFlags = verdict === 'Stage 2 强势候选'
     ? []
     : verdict === '观察名单'
@@ -195,7 +252,7 @@ function buildSepaReport(ctx: AnalysisInputContext): AnalysisReport {
     symbol: ctx.symbol,
     skillId: 'sepa',
     title: `${name} SEPA 趋势分析`,
-    summary: `${name} 当前判断为 ${stage}，综合结论：${verdict}。基于 Minervini 趋势模板启发式检查，不含 RS 与基本面验证。`,
+    summary: `${name} 当前判断为 ${stage}，综合结论：${verdict}。基于 Minervini 趋势模板启发式检查，RS 使用相对 ${ctx.relativeStrength.benchmarkSymbol} 的超额收益近似。`,
     sections: [
       {
         title: '阶段判断',
@@ -215,6 +272,9 @@ function buildSepaReport(ctx: AnalysisInputContext): AnalysisReport {
           { label: '止损参考（-7.5%）', value: ctx.technical.price != null ? fmtNum(ctx.technical.price * 0.925) : '-' },
           { label: '52 周高', value: fmtNum(ctx.technical.week52High) },
           { label: '52 周低', value: fmtNum(ctx.technical.week52Low) },
+          { label: `相对 ${ctx.relativeStrength.benchmarkSymbol} 3M`, value: fmtPct(ctx.relativeStrength.excessReturn3M) },
+          { label: `相对 ${ctx.relativeStrength.benchmarkSymbol} 6M`, value: fmtPct(ctx.relativeStrength.excessReturn6M) },
+          { label: `相对 ${ctx.relativeStrength.benchmarkSymbol} 1Y`, value: fmtPct(ctx.relativeStrength.excessReturn1Y) },
         ],
       },
       {
@@ -297,12 +357,14 @@ function buildLiquidityReport(ctx: AnalysisInputContext): AnalysisReport {
   const name = ctx.companyName ?? ctx.symbol
   const turnover = q?.turnoverRate ?? null
   const volume = q?.volume ?? null
+  const avgVolume20 = ctx.technical.avgVolume20
+  const volumeRatio = ctx.technical.volumeRatio
 
   let liquidityGrade = '未知'
-  if (turnover != null) {
-    if (turnover >= 1)
+  if (turnover != null || volumeRatio != null) {
+    if ((turnover != null && turnover >= 1) || (volumeRatio != null && volumeRatio >= 1.5))
       liquidityGrade = '活跃'
-    else if (turnover >= 0.2)
+    else if ((turnover != null && turnover >= 0.2) || (volumeRatio != null && volumeRatio >= 0.8))
       liquidityGrade = '正常'
     else
       liquidityGrade = '偏低'
@@ -313,19 +375,23 @@ function buildLiquidityReport(ctx: AnalysisInputContext): AnalysisReport {
     flags.push('换手率极低，可能存在流动性风险')
   if (volume == null)
     flags.push('成交量数据缺失')
+  if (avgVolume20 == null)
+    flags.push('成交量历史数据不足，量能判断不可用')
 
   return {
     id: randomUUID(),
     symbol: ctx.symbol,
     skillId: 'liquidity',
     title: `${name} 流动性分析`,
-    summary: `${name} 流动性评级：${liquidityGrade}。${turnover != null ? `当日换手率 ${fmtPct(turnover)}。` : '换手率数据缺失。'}`,
+    summary: `${name} 流动性评级：${liquidityGrade}。${turnover != null ? `当日换手率 ${fmtPct(turnover)}。` : '换手率数据缺失。'}${volumeRatio != null ? ` 当前量能为 20 日均量的 ${fmtMultiple(volumeRatio)}。` : ''}`,
     sections: [
       {
         title: '流动性指标',
         kind: 'metrics',
         metrics: [
           { label: '成交量', value: volume != null ? volume.toLocaleString('en-US') : '-' },
+          { label: '20 日均量', value: avgVolume20 != null ? avgVolume20.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-' },
+          { label: '量能倍数', value: fmtMultiple(volumeRatio) },
           { label: '换手率', value: fmtPct(turnover) },
           { label: '市值', value: q?.marketCap != null ? `$${(q.marketCap / 1e9).toFixed(2)}B` : '-' },
           { label: '流动性评级', value: liquidityGrade },
@@ -336,6 +402,7 @@ function buildLiquidityReport(ctx: AnalysisInputContext): AnalysisReport {
         kind: 'list',
         items: [
           '高换手通常意味着更好的进出效率，但也可能伴随更高波动。',
+          '20 日均量用于过滤单日成交量噪音，量能倍数高于 1 表示当前成交活跃度高于近期均值。',
           '低流动性股票在大额交易时可能产生更高滑点。',
           '完整流动性分析还需 bid-ask spread、Amihud 比率等，当前版本未接入。',
         ],

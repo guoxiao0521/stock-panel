@@ -1,6 +1,7 @@
 import type {
   AnalysisInputContext,
   AnalysisMarketContext,
+  AnalysisRelativeStrengthSummary,
   AnalysisReport,
   AnalysisSkillId,
   Candle,
@@ -11,6 +12,8 @@ import type {
 import { ANALYSIS_SKILL_IDS, HISTORY_RANGES } from '#shared/types'
 import { DEFAULT_WATCHLIST_ID } from './db'
 import { MACRO_SYMBOLS } from './macro-config'
+
+const RELATIVE_STRENGTH_BENCHMARK = 'SPY'
 
 function computeMarketContext(metrics: MacroMetricSnapshot[]): AnalysisMarketContext {
   const map = new Map(metrics.map(m => [m.symbol, m]))
@@ -63,6 +66,45 @@ function normalizeSymbol(symbol: string): string {
 
 function isValidSkillId(skillId: string): skillId is AnalysisSkillId {
   return ANALYSIS_SKILL_IDS.includes(skillId as AnalysisSkillId)
+}
+
+function needsRelativeStrength(skillId: AnalysisSkillId): boolean {
+  return skillId === 'overview' || skillId === 'sepa'
+}
+
+function returnOverTradingDays(candles: Candle[], days: number): number | null {
+  if (candles.length <= days)
+    return null
+
+  const latest = candles[candles.length - 1]!
+  const startIndex = candles.length - 1 - days
+  const start = candles[startIndex]!
+  if (latest.close <= 0 || start.close <= 0 || latest.time === start.time)
+    return null
+
+  return ((latest.close - start.close) / start.close) * 100
+}
+
+function excessReturn(
+  stockCandles: Candle[],
+  benchmarkCandles: Candle[],
+  days: number,
+): number | null {
+  const stockReturn = returnOverTradingDays(stockCandles, days)
+  const benchmarkReturn = returnOverTradingDays(benchmarkCandles, days)
+  return stockReturn != null && benchmarkReturn != null ? stockReturn - benchmarkReturn : null
+}
+
+function computeRelativeStrength(
+  stockCandles: Candle[],
+  benchmarkCandles: Candle[],
+): AnalysisRelativeStrengthSummary {
+  return {
+    benchmarkSymbol: RELATIVE_STRENGTH_BENCHMARK,
+    excessReturn3M: excessReturn(stockCandles, benchmarkCandles, 63),
+    excessReturn6M: excessReturn(stockCandles, benchmarkCandles, 126),
+    excessReturn1Y: excessReturn(stockCandles, benchmarkCandles, 252),
+  }
 }
 
 async function resolveQuote(symbol: string, forceRefresh: boolean) {
@@ -128,6 +170,27 @@ export async function runStockAnalysis(body: RunAnalysisBody): Promise<AnalysisR
     dataGaps.push('历史数据较短，均线与趋势判断可能不准确')
 
   const technical = computeTechnicalSummary(candles, quote?.volume ?? null)
+  if (technical.avgVolume20 == null)
+    dataGaps.push('成交量历史数据不足，量能判断不可用')
+
+  let relativeStrength: AnalysisRelativeStrengthSummary = {
+    benchmarkSymbol: RELATIVE_STRENGTH_BENCHMARK,
+    excessReturn3M: null,
+    excessReturn6M: null,
+    excessReturn1Y: null,
+  }
+  if (needsRelativeStrength(body.skillId)) {
+    try {
+      const [relativeStockCandles, benchmarkCandles] = await Promise.all([
+        range === '1Y' ? Promise.resolve(candles) : fetchHistory(symbol, '1Y'),
+        fetchHistory(RELATIVE_STRENGTH_BENCHMARK, '1Y'),
+      ])
+      relativeStrength = computeRelativeStrength(relativeStockCandles, benchmarkCandles)
+    }
+    catch {
+      dataGaps.push('相对强度 benchmark 数据不可用')
+    }
+  }
 
   const macroMetrics = getMacroSnapshots(MACRO_SYMBOLS)
   if (macroMetrics.every(m => m.value == null && m.error))
@@ -144,6 +207,7 @@ export async function runStockAnalysis(body: RunAnalysisBody): Promise<AnalysisR
     quote,
     candles,
     technical,
+    relativeStrength,
     macroMetrics,
     marketContext,
     watchlistNote: watchlistItem?.note ?? null,

@@ -79,6 +79,7 @@ export interface Candle {
   high: number
   low: number
   close: number
+  volume: number | null
 }
 
 /** 排序方式 */
@@ -198,8 +199,19 @@ export interface AnalysisSection {
   items?: string[]
 }
 
+export interface TechnicalSupportLevel {
+  label: string
+  price: number
+  rangeLow: number
+  rangeHigh: number
+  basis: string
+}
+
 export interface AnalysisTechnicalSummary {
   price: number | null
+  ma5: number | null
+  ma10: number | null
+  ma20: number | null
   ma50: number | null
   ma150: number | null
   ma200: number | null
@@ -211,7 +223,15 @@ export interface AnalysisTechnicalSummary {
   avgVolume20: number | null
   volumeRatio: number | null
   supportLevel: number | null
+  supportLevels: TechnicalSupportLevel[]
   resistanceLevel: number | null
+}
+
+export interface AnalysisRelativeStrengthSummary {
+  benchmarkSymbol: string
+  excessReturn3M: number | null
+  excessReturn6M: number | null
+  excessReturn1Y: number | null
 }
 
 export interface AnalysisMarketContext {
@@ -228,6 +248,7 @@ export interface AnalysisInputContext {
   quote: QuoteSnapshot | null
   candles: Candle[]
   technical: AnalysisTechnicalSummary
+  relativeStrength: AnalysisRelativeStrengthSummary
   macroMetrics: MacroMetricSnapshot[]
   marketContext: AnalysisMarketContext
   watchlistNote: string | null

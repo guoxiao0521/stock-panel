@@ -138,9 +138,10 @@ export async function fetchHistory(symbol: string, range: HistoryRange): Promise
     const high = num(q.high)
     const low = num(q.low)
     const close = num(q.close)
+    const volume = num(q.volume)
     if (open == null || high == null || low == null || close == null || !q.date)
       continue
-    candles.push({ time: toDateString(new Date(q.date)), open, high, low, close })
+    candles.push({ time: toDateString(new Date(q.date)), open, high, low, close, volume })
   }
   return candles
 }
