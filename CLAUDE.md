@@ -1,1 +1,1 @@
-D:/repo/stock-panel/AGENT.md
+D:/repo/stock-panel/AGENTS.md
