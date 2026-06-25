@@ -82,6 +82,33 @@ export interface Candle {
   volume: number | null
 }
 
+/** 盘中走势单点，time 为 UNIX 秒级时间戳（区别于日线 Candle 的日期字符串） */
+export interface IntradayPoint {
+  time: number
+  value: number
+}
+
+/** 主要指数当日（盘中）走势序列，用于基线区域图（以昨收为基准着色） */
+export interface IntradaySeries {
+  symbol: string
+  name: string
+  points: IntradayPoint[]
+  /** 昨收，作为基线参考与涨跌计算基准 */
+  previousClose: number | null
+  last: number | null
+  change: number | null
+  changePercent: number | null
+  currency: string | null
+  /** Yahoo marketState：REGULAR / CLOSED / PRE / POST 等，驱动前端轮询节奏 */
+  marketState: string | null
+  /** 市场时区相对 UTC 的秒偏移，用于 X 轴显示市场本地时间 */
+  gmtOffset: number | null
+  /** 采样会话交易日 yyyy-mm-dd */
+  sessionDate: string | null
+  fetchedAt: string
+  error: string | null
+}
+
 /** 排序方式 */
 export type SortKey
   = | 'manual'

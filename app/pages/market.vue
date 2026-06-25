@@ -2,16 +2,18 @@
 import { AlertTriangleIcon } from '@lucide/vue'
 import { onMounted } from 'vue'
 import { toast } from 'vue-sonner'
+import IntradayIndexCard from '@/components/IntradayIndexCard.vue'
 import MacroMetricCard from '@/components/MacroMetricCard.vue'
 import MarketStatusSummary from '@/components/MarketStatusSummary.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const { metrics, summary, loading, error, load, refresh } = useMarket()
+const { series: indexSeries, load: loadIndices, start: startIndices } = useIntradayIndices()
 const { updatedAt, onRefresh } = useAppHeader()
 
-// 注册顶部刷新按钮（手动刷新忽略缓存）
+// 注册顶部刷新按钮（手动刷新忽略缓存，宏观指标与指数走势一起刷新）
 onRefresh(async () => {
-  const result = await refresh(true)
+  const [result] = await Promise.all([refresh(true), loadIndices()])
   updatedAt.value = new Date().toISOString()
   if (!result.ok)
     toast.error('刷新宏观指标失败')
@@ -22,6 +24,8 @@ onRefresh(async () => {
 })
 
 onMounted(async () => {
+  // 主要指数当日走势：首屏拉取并启动盘中自动轮询
+  startIndices()
   // 首屏优先展示缓存，再异步刷新过期指标（PRD 10.2 / 15）
   await load()
   updatedAt.value = new Date().toISOString()
@@ -48,6 +52,16 @@ onMounted(async () => {
       <AlertTriangleIcon class="size-4 shrink-0" />
       <span>{{ error }}，已保留现有数据。</span>
     </div>
+
+    <section class="space-y-2">
+      <h2 class="text-sm font-medium text-muted-foreground">主要指数当日走势</h2>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <template v-if="indexSeries.length > 0">
+          <IntradayIndexCard v-for="s in indexSeries" :key="s.symbol" :series="s" />
+        </template>
+        <Skeleton v-for="i in 3" v-else :key="i" class="h-64 w-full rounded-xl" />
+      </div>
+    </section>
 
     <MarketStatusSummary :summary="summary" />
 

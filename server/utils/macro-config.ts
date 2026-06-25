@@ -21,6 +21,19 @@ export const MACRO_METRICS: MacroMetricConfig[] = [
 
 export const MACRO_SYMBOLS: string[] = MACRO_METRICS.map(m => m.symbol)
 
+export interface IndexConfig {
+  symbol: string
+  name: string
+}
+
+// 主要指数当日走势清单（道指 / 纳指综合 / 标普）。独立于 MACRO_METRICS，
+// 因含未在宏观卡片中展示的 ^DJI / ^IXIC。
+export const INTRADAY_INDICES: IndexConfig[] = [
+  { symbol: '^DJI', name: '道琼斯' },
+  { symbol: '^IXIC', name: '纳斯达克' },
+  { symbol: '^GSPC', name: '标普 500' },
+]
+
 const NAME_BY_SYMBOL = new Map(MACRO_METRICS.map(m => [m.symbol, m.name]))
 
 export function macroName(symbol: string): string {

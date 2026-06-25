@@ -1,1 +1,3 @@
-D:/repo/stock-panel/AGENT.md
+# CLAUDE.md
+
+See [AGENTS.md](AGENTS.md) for the repository agent instructions.
