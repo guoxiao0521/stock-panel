@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { MoonIcon, RefreshCwIcon, SunIcon, TrendingUpIcon } from '@lucide/vue'
+import { LogOutIcon, MoonIcon, RefreshCwIcon, SunIcon, TrendingUpIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDateTime } from '@/lib/format'
 
 interface NavItem {
@@ -25,6 +33,15 @@ const emit = defineEmits<{
 }>()
 
 const { mode, toggle } = useTheme()
+const { loggedIn, user, signInWithGoogle, signOut } = useAuthState()
+
+async function loginWithGoogle() {
+  await signInWithGoogle()
+}
+
+async function logout() {
+  await signOut()
+}
 </script>
 
 <template>
@@ -71,6 +88,43 @@ const { mode, toggle } = useTheme()
         <Button variant="ghost" size="icon" aria-label="切换主题" @click="toggle">
           <SunIcon v-if="mode === 'dark'" class="size-4" />
           <MoonIcon v-else class="size-4" />
+        </Button>
+
+        <!-- 用户菜单（已登录） -->
+        <DropdownMenu v-if="loggedIn && user">
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon" class="rounded-full" aria-label="用户菜单">
+              <img
+                v-if="user.avatarUrl"
+                :src="user.avatarUrl"
+                :alt="user.name"
+                class="size-7 rounded-full object-cover"
+                referrerpolicy="no-referrer"
+              />
+              <span
+                v-else
+                class="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+              >
+                {{ user.name.charAt(0).toUpperCase() }}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-52">
+            <DropdownMenuLabel class="flex flex-col gap-0.5 py-2 font-normal">
+              <span class="font-medium leading-tight">{{ user.name }}</span>
+              <span class="text-xs text-muted-foreground">{{ user.email }}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem class="cursor-pointer" @click="logout">
+              <LogOutIcon class="mr-2 size-4" />
+              退出登录
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <!-- 登录按钮（未登录） -->
+        <Button v-else variant="outline" size="sm" @click="loginWithGoogle">
+          使用 Google 登录
         </Button>
       </div>
     </div>

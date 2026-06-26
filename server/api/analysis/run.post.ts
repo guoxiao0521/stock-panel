@@ -47,8 +47,10 @@ export default defineEventHandler(async (event) => {
     forceRefresh: body.forceRefresh !== false,
   }
 
+  const watchlistId = await resolveWatchlistId(event)
+
   try {
-    const report = await runStockAnalysis(analysisBody)
+    const report = await runStockAnalysis(analysisBody, watchlistId)
     return { report } satisfies RunAnalysisResponse
   }
   catch (e) {

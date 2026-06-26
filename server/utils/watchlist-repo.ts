@@ -208,3 +208,20 @@ export function deleteWatchlistItem(id: string): boolean {
   const result = db.prepare(`DELETE FROM watchlist_items WHERE id = ?`).run(id)
   return result.changes > 0
 }
+
+/** 查找或建立用户专属自选股列表，返回其 ID */
+export function findOrCreateUserWatchlist(userId: string): string {
+  const db = useDatabase()
+  const row = db
+    .prepare(`SELECT id FROM watchlists WHERE user_id = ? LIMIT 1`)
+    .get(userId) as { id: string } | undefined
+  if (row)
+    return row.id
+
+  const id = randomUUID()
+  const now = new Date().toISOString()
+  db.prepare(
+    `INSERT INTO watchlists (id, name, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, '我的自选股', userId, now, now)
+  return id
+}

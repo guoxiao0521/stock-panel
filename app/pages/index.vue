@@ -25,6 +25,7 @@ const {
 } = useWatchlist()
 
 const { updatedAt, onRefresh } = useAppHeader()
+const { loggedIn } = useAuthState()
 
 const selected = ref<WatchlistRow | null>(null)
 const detailOpen = ref(false)
@@ -55,6 +56,10 @@ function errMessage(e: unknown, fallback: string): string {
 }
 
 async function onAdd(symbol: string) {
+  if (!loggedIn.value) {
+    toast.error('请先登录后再添加自选股')
+    return
+  }
   try {
     await add(symbol)
     toast.success(`已添加 ${symbol}`)
@@ -97,6 +102,13 @@ async function onUpdateTags(id: string, tags: string[]) {
     toast.error(errMessage(e, '标签保存失败'))
   }
 }
+
+// 登录态变化时重新加载列表（登录→个人列表，退出→默认列表）
+watch(loggedIn, async () => {
+  await load()
+  await refresh(false)
+  updatedAt.value = new Date().toISOString()
+})
 
 // 注册顶部刷新按钮的行为（手动刷新忽略缓存）
 onRefresh(async () => {

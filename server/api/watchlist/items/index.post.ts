@@ -1,8 +1,9 @@
 import type { CreateWatchlistItemBody } from '#shared/types'
-import { DEFAULT_WATCHLIST_ID } from '../../../utils/db'
 
-/** POST /api/watchlist/items — 添加自选股（含 yahoo-finance2 校验与首次行情） */
+/** POST /api/watchlist/items — 添加自选股（需登录；含 yahoo-finance2 校验与首次行情） */
 export default defineEventHandler(async (event) => {
+  await requireCurrentSession(event)
+
   const body = await readBody<CreateWatchlistItemBody>(event)
 
   const raw = (body?.symbol ?? '').trim().toUpperCase()
@@ -13,7 +14,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: '股票代码格式不正确' })
   }
 
-  if (findItemBySymbol(DEFAULT_WATCHLIST_ID, raw)) {
+  const watchlistId = await resolveWatchlistId(event)
+  if (findItemBySymbol(watchlistId, raw)) {
     throw createError({ statusCode: 409, message: `${raw} 已在自选股列表中` })
   }
 
@@ -26,7 +28,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: `无法找到美股代码 ${raw}` })
   }
 
-  const item = createWatchlistItem(DEFAULT_WATCHLIST_ID, {
+  const item = createWatchlistItem(watchlistId, {
     symbol: raw,
     name: quoteResult.meta.name,
     exchange: quoteResult.meta.exchange,

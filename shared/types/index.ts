@@ -1,9 +1,19 @@
 // 前后端共用的领域类型，对应 PRD 第 11 节 SQLite 数据模型
 
+/** 已认证用户（Google OAuth 登录后由 better-auth 管理） */
+export interface User {
+  id: string
+  email: string
+  name: string
+  avatarUrl: string | null
+}
+
 /** 自选股列表（预留多列表能力，Phase 1 仅默认列表） */
 export interface Watchlist {
   id: string
   name: string
+  /** 归属用户 ID；null 表示匿名共享默认列表 */
+  userId: string | null
   createdAt: string
   updatedAt: string
 }

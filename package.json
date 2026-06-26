@@ -13,6 +13,7 @@
     "@lucide/vue": "^1.18.0",
     "@tanstack/vue-table": "^8.21.3",
     "@vueuse/core": "^14.3.0",
+    "better-auth": "^1.6.22",
     "better-sqlite3": "^12.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

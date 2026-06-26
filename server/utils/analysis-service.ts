@@ -107,7 +107,7 @@ function computeRelativeStrength(
   }
 }
 
-async function resolveQuote(symbol: string, forceRefresh: boolean) {
+async function resolveQuote(symbol: string, forceRefresh: boolean, watchlistId: string) {
   const dataGaps: string[] = []
   let quote = getQuoteSnapshot(symbol)
 
@@ -115,7 +115,7 @@ async function resolveQuote(symbol: string, forceRefresh: boolean) {
     try {
       const result = await fetchQuote(symbol)
       upsertQuoteSnapshot(result.snapshot, result.raw ? JSON.stringify(result.raw) : null)
-      backfillItemMeta(DEFAULT_WATCHLIST_ID, symbol, result.meta)
+      backfillItemMeta(watchlistId, symbol, result.meta)
       quote = result.snapshot
     }
     catch (e) {
@@ -138,7 +138,7 @@ async function resolveQuote(symbol: string, forceRefresh: boolean) {
 }
 
 /** 组装分析输入并调用 runner 生成报告 */
-export async function runStockAnalysis(body: RunAnalysisBody): Promise<AnalysisReport> {
+export async function runStockAnalysis(body: RunAnalysisBody, watchlistId = DEFAULT_WATCHLIST_ID): Promise<AnalysisReport> {
   if (typeof body.symbol !== 'string')
     throw new Error('SYMBOL_REQUIRED')
 
@@ -155,7 +155,7 @@ export async function runStockAnalysis(body: RunAnalysisBody): Promise<AnalysisR
 
   const forceRefresh = body.forceRefresh !== false
 
-  const { quote, dataGaps: quoteGaps } = await resolveQuote(symbol, forceRefresh)
+  const { quote, dataGaps: quoteGaps } = await resolveQuote(symbol, forceRefresh, watchlistId)
   const dataGaps = [...quoteGaps]
 
   let candles: Candle[] = []
@@ -197,7 +197,7 @@ export async function runStockAnalysis(body: RunAnalysisBody): Promise<AnalysisR
     dataGaps.push('宏观指标缺失')
 
   const marketContext = computeMarketContext(macroMetrics)
-  const watchlistItem = findItemBySymbol(DEFAULT_WATCHLIST_ID, symbol)
+  const watchlistItem = findItemBySymbol(watchlistId, symbol)
 
   const context: AnalysisInputContext = {
     symbol,
