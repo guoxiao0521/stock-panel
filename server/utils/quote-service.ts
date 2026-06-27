@@ -12,6 +12,9 @@ const yf = new YahooFinance({
   },
 })
 
+const QUOTE_TIMEOUT_MS = 12_000
+const QUOTE_DETAIL_TIMEOUT_MS = 8_000
+
 export interface QuoteMeta {
   name: string | null
   exchange: string | null
@@ -28,13 +31,26 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), ms)
+    promise
+      .then(resolve, reject)
+      .finally(() => clearTimeout(timer))
+  })
+}
+
 /** 年初至今涨跌幅：当年首个可用交易日收盘价对比最新价 */
 async function fetchYtd(symbol: string, price: number | null): Promise<number | null> {
   if (price == null)
     return null
   try {
     const start = new Date(new Date().getFullYear(), 0, 1)
-    const chart = await yf.chart(symbol, { period1: start, interval: '1d' })
+    const chart = await withTimeout(
+      yf.chart(symbol, { period1: start, interval: '1d' }),
+      QUOTE_DETAIL_TIMEOUT_MS,
+      'YTD',
+    )
     const firstClose = chart.quotes.find(q => q.close != null)?.close ?? null
     if (firstClose == null || firstClose === 0)
       return null
@@ -48,7 +64,11 @@ async function fetchYtd(symbol: string, price: number | null): Promise<number | 
 /** 流通股本（best-effort），用于换手率优先项 */
 async function fetchFloatShares(symbol: string): Promise<number | null> {
   try {
-    const summary = await yf.quoteSummary(symbol, { modules: ['defaultKeyStatistics'] })
+    const summary = await withTimeout(
+      yf.quoteSummary(symbol, { modules: ['defaultKeyStatistics'] }),
+      QUOTE_DETAIL_TIMEOUT_MS,
+      'FLOAT_SHARES',
+    )
     return num(summary.defaultKeyStatistics?.floatShares)
   }
   catch {
@@ -59,7 +79,7 @@ async function fetchFloatShares(symbol: string): Promise<number | null> {
 /** 校验并获取单只股票的行情快照，无效 ticker 会抛错 */
 export async function fetchQuote(symbol: string): Promise<QuoteResult> {
   const sym = symbol.trim().toUpperCase()
-  const q = await yf.quote(sym)
+  const q = await withTimeout(yf.quote(sym), QUOTE_TIMEOUT_MS, 'QUOTE')
   if (!q || !q.symbol)
     throw new Error('SYMBOL_NOT_FOUND')
 

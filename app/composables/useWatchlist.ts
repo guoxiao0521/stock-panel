@@ -90,6 +90,7 @@ export function useWatchlist() {
     const item = await $fetch('/api/watchlist/items', {
       method: 'POST',
       body: { symbol: symbol.trim().toUpperCase() },
+      timeout: 30_000,
     })
     items.value.push(item as WatchlistRow)
     return item as WatchlistRow

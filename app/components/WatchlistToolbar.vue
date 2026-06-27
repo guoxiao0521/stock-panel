@@ -19,8 +19,13 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  add: [symbol: string]
+  add: [symbol: string, controls: AddSymbolDialogControls]
 }>()
+
+interface AddSymbolDialogControls {
+  resolve: () => void
+  reject: (message: string) => void
+}
 
 const search = defineModel<string>('search', { default: '' })
 const sortKey = defineModel<SortKey>('sortKey', { default: 'manual' })
@@ -29,6 +34,10 @@ const autoRefresh = defineModel<boolean>('autoRefresh', { default: false })
 
 function toggleDirection() {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+
+function forwardAdd(symbol: string, controls: AddSymbolDialogControls) {
+  emit('add', symbol, controls)
 }
 </script>
 
@@ -85,7 +94,7 @@ function toggleDirection() {
     </span>
 
     <div class="ml-auto">
-      <AddSymbolDialog :exists="exists" @add="emit('add', $event)" />
+      <AddSymbolDialog :exists="exists" @add="forwardAdd" />
     </div>
   </div>
 </template>

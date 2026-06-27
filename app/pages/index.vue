@@ -27,6 +27,11 @@ const {
 const { updatedAt, onRefresh } = useAppHeader()
 const { loggedIn } = useAuthState()
 
+interface AddSymbolDialogControls {
+  resolve: () => void
+  reject: (message: string) => void
+}
+
 const selected = ref<WatchlistRow | null>(null)
 const detailOpen = ref(false)
 
@@ -55,18 +60,23 @@ function errMessage(e: unknown, fallback: string): string {
   return err?.data?.statusMessage || err?.data?.message || err?.statusMessage || fallback
 }
 
-async function onAdd(symbol: string) {
+async function onAdd(symbol: string, controls?: AddSymbolDialogControls) {
   if (!loggedIn.value) {
-    toast.error('请先登录后再添加自选股')
+    const message = '请先登录后再添加自选股'
+    controls?.reject(message)
+    toast.error(message)
     return
   }
   try {
     await add(symbol)
+    controls?.resolve()
     toast.success(`已添加 ${symbol}`)
     updatedAt.value = new Date().toISOString()
   }
   catch (e) {
-    toast.error(errMessage(e, `${symbol} 添加失败`))
+    const message = errMessage(e, `${symbol} 添加失败`)
+    controls?.reject(message)
+    toast.error(message)
   }
 }
 
@@ -118,7 +128,7 @@ onRefresh(async () => {
 })
 
 onMounted(async () => {
-  // 首屏优先展示 SQLite 缓存，再异步刷新过期行情（PRD 15）
+  // 首屏优先展示缓存，再异步刷新过期行情（PRD 15）
   await load()
   updatedAt.value = new Date().toISOString()
   await refresh(false)
