@@ -9,7 +9,7 @@
 - UI：Tailwind CSS v4、shadcn-vue、Reka UI、lucide-vue、vue-sonner。
 - Charts / Tables：lightweight-charts、@tanstack/vue-table。
 - Server：Nuxt Nitro server routes。
-- Data：SQLite，本地数据库由 `better-sqlite3` 访问，默认路径 `./.data/stock-panel.db`。
+- Data：Supabase Postgres，通过服务端 `pg` Pool 和 `DATABASE_URL` 访问；业务表位于 `stock_panel` schema。
 - Market Data：`yahoo-finance2`，行情服务在 server utils 中封装。
 - Shared Types：前后端共用类型放在 `shared/types`，通过 `#shared/types` 引用。
 
@@ -44,7 +44,7 @@ public/                   静态资源
 - Route 层禁止业务逻辑：`server/api/**` 只负责参数读取、校验、HTTP 错误和调用 service/repository。
 - 服务端业务编排放在 `server/utils/*-service.ts`。
 - 数据库读写放在 `server/utils/*-repo.ts` 或明确的数据访问模块。
-- SQLite 初始化、连接和低层 DB 能力集中在 `server/utils/db.ts`。
+- Postgres 连接和低层 DB helper 集中在 `server/utils/db.ts`；schema 变更通过 `supabase/migrations` 管理，不在运行时自动建表。
 - 行情源、缓存、批量刷新、容错逻辑由 quote/macro service 负责，不在 Vue 组件或 route 中实现。
 - 前端页面 `app/pages/**` 负责组合视图，不承载复杂业务流程。
 - 前端状态、筛选、排序、API 调用优先放入 `app/composables/**`。
@@ -58,7 +58,7 @@ public/                   静态资源
 - 不绕过已有 repository/service 直接访问数据库，除非是在扩展同一层职责。
 - 外部 API 调用必须隔离在服务端，前端不要直接调用行情源或数据库。
 - 错误处理应贴近边界：route 转 HTTP 错误，service/repo 返回明确结果或抛出领域错误。
-- 任何持久化字段变更都要同步考虑 SQLite schema、repo mapper、shared type 和 UI 展示。
+- 任何持久化字段变更都要同步考虑 Supabase migration、repo mapper、shared type 和 UI 展示。
 
 ## Code Style（代码规范）
 

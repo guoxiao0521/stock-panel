@@ -2,7 +2,7 @@
 
 面向个人投资者自用的美股观察与分析面板。第一阶段聚焦自选股管理与关键行情指标展示。
 
-技术栈：Nuxt 4 · Vue 3 · TypeScript · Tailwind CSS v4 · shadcn-vue · SQLite（better-sqlite3）· yahoo-finance2。
+技术栈：Nuxt 4 · Vue 3 · TypeScript · Tailwind CSS v4 · shadcn-vue · Supabase Postgres（pg）· yahoo-finance2。
 
 详细产品需求见 [`docs/PRD.md`](./docs/PRD.md)。
 
@@ -12,14 +12,13 @@
 - 行情表格：最新价、日涨跌、年初至今、成交量、换手率、市盈率、市值。
 - 搜索、排序（含升/降序切换）、手动刷新与自动刷新（5 分钟可选）。
 - 个股详情侧栏：关键指标、备注与标签编辑。
-- 数据持久化到本地 SQLite，行情快照带缓存（默认 5 分钟）。
+- 数据持久化到 Supabase Postgres，行情快照带缓存（默认 5 分钟）。
 
 ## 环境要求
 
 - Node.js >= 22
 - pnpm（仓库使用 pnpm 作为包管理器）
-
-> `better-sqlite3` 为原生模块，安装时会下载预编译二进制；如失败需本地具备 C++ 构建工具链。
+- Supabase Postgres 连接串（运行时读取 `DATABASE_URL`）
 
 ## 安装
 
@@ -35,13 +34,18 @@ pnpm install
 pnpm dev
 ```
 
-首次运行会在 `./.data/stock-panel.db` 自动创建 SQLite 数据库与表结构。
+首次运行前需要先将 `supabase/migrations` 应用到 Supabase Postgres；本应用不会在运行时自动建表。
 
 ### 环境变量
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| `NUXT_DB_PATH` | SQLite 数据库文件路径 | `./.data/stock-panel.db` |
+| `DATABASE_URL` | 服务端 Postgres 连接串，推荐 Supabase pooled connection，并带 `stock_panel,public` search_path | 必填 |
+| `DATABASE_DIRECT_URL` | migration/admin 直连 Postgres 连接串 | 可选 |
+| `SUPABASE_URL` | 前端 Supabase project URL（仅保留给 public runtime config） | 可选 |
+| `SUPABASE_KEY` | 前端 Supabase publishable key（不是 service role） | 可选 |
+| `BETTER_AUTH_SECRET` | better-auth session secret | 必填 |
+| `BETTER_AUTH_URL` | better-auth base URL | `http://localhost:3000` |
 
 ## 构建与预览
 
@@ -63,7 +67,7 @@ server/
   api/                Nitro server routes
     watchlist/        自选股 CRUD
     quotes/           行情查询与刷新
-  utils/              db、repository、quote-service（自动导入）
+  utils/              Postgres pool、repository、quote-service（自动导入）
 shared/types/         前后端共用领域类型（#shared/types）
 docs/PRD.md           产品需求文档
 ```

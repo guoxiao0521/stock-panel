@@ -24,11 +24,11 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
     change: row.change,
     changePercent: row.change_percent,
     ytdChangePercent: row.ytd_change_percent,
-    volume: row.volume,
+    volume: row.volume == null ? null : Number(row.volume),
     turnoverRate: row.turnover_rate,
     trailingPe: row.trailing_pe,
     forwardPe: row.forward_pe,
-    marketCap: row.market_cap,
+    marketCap: row.market_cap == null ? null : Number(row.market_cap),
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,
@@ -37,15 +37,14 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
 }
 
 /** 写入或更新一条行情快照（每个 symbol 仅保留最新，PRD 15） */
-export function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: string | null) {
-  const db = useDatabase()
-  db.prepare(
-    `INSERT INTO quote_snapshots
+export async function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: string | null): Promise<void> {
+  await dbQuery(
+    `INSERT INTO stock_panel.quote_snapshots
        (symbol, price, change, change_percent, ytd_change_percent, volume, turnover_rate,
         trailing_pe, forward_pe, market_cap, quote_time, fetched_at, source, error, raw_json)
      VALUES
-       (@symbol, @price, @change, @changePercent, @ytdChangePercent, @volume, @turnoverRate,
-        @trailingPe, @forwardPe, @marketCap, @quoteTime, @fetchedAt, @source, @error, @rawJson)
+       ($1, $2, $3, $4, $5, $6, $7,
+        $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
      ON CONFLICT(symbol) DO UPDATE SET
        price = excluded.price,
        change = excluded.change,
@@ -61,55 +60,56 @@ export function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: string | 
        source = excluded.source,
        error = excluded.error,
        raw_json = excluded.raw_json`,
-  ).run({
-    symbol: snapshot.symbol,
-    price: snapshot.price,
-    change: snapshot.change,
-    changePercent: snapshot.changePercent,
-    ytdChangePercent: snapshot.ytdChangePercent,
-    volume: snapshot.volume,
-    turnoverRate: snapshot.turnoverRate,
-    trailingPe: snapshot.trailingPe,
-    forwardPe: snapshot.forwardPe,
-    marketCap: snapshot.marketCap,
-    quoteTime: snapshot.quoteTime,
-    fetchedAt: snapshot.fetchedAt,
-    source: snapshot.source,
-    error: snapshot.error,
-    rawJson: rawJson ?? null,
-  })
+    [
+      snapshot.symbol,
+      snapshot.price,
+      snapshot.change,
+      snapshot.changePercent,
+      snapshot.ytdChangePercent,
+      snapshot.volume,
+      snapshot.turnoverRate,
+      snapshot.trailingPe,
+      snapshot.forwardPe,
+      snapshot.marketCap,
+      snapshot.quoteTime,
+      snapshot.fetchedAt,
+      snapshot.source,
+      snapshot.error,
+      rawJson ?? null,
+    ],
+  )
 }
 
 /**
  * 仅记录单只股票的刷新错误，保留已有快照数据（PRD 10.2 / 14）。
  * 若该 symbol 尚无快照，则插入一条仅含错误的占位记录。
  */
-export function recordQuoteError(symbol: string, error: string, fetchedAt: string) {
-  const db = useDatabase()
-  db.prepare(
-    `INSERT INTO quote_snapshots (symbol, fetched_at, source, error)
-     VALUES (?, ?, 'yahoo-finance2', ?)
+export async function recordQuoteError(symbol: string, error: string, fetchedAt: string): Promise<void> {
+  await dbQuery(
+    `INSERT INTO stock_panel.quote_snapshots (symbol, fetched_at, source, error)
+     VALUES ($1, $2, 'yahoo-finance2', $3)
      ON CONFLICT(symbol) DO UPDATE SET
        error = excluded.error,
        fetched_at = excluded.fetched_at`,
-  ).run(symbol.toUpperCase(), fetchedAt, error)
+    [symbol.toUpperCase(), fetchedAt, error],
+  )
 }
 
-export function getQuoteSnapshots(symbols: string[]): QuoteSnapshot[] {
+export async function getQuoteSnapshots(symbols: string[]): Promise<QuoteSnapshot[]> {
   if (symbols.length === 0)
     return []
-  const db = useDatabase()
-  const placeholders = symbols.map(() => '?').join(',')
-  const rows = db
-    .prepare(`SELECT * FROM quote_snapshots WHERE symbol IN (${placeholders})`)
-    .all(...symbols.map(s => s.toUpperCase())) as QuoteRow[]
+  const { rows } = await dbQuery<QuoteRow>(
+    `SELECT * FROM stock_panel.quote_snapshots WHERE symbol = ANY($1::text[])`,
+    [symbols.map(s => s.toUpperCase())],
+  )
   return rows.map(mapQuote)
 }
 
-export function getQuoteSnapshot(symbol: string): QuoteSnapshot | null {
-  const db = useDatabase()
-  const row = db
-    .prepare(`SELECT * FROM quote_snapshots WHERE symbol = ?`)
-    .get(symbol.toUpperCase()) as QuoteRow | undefined
+export async function getQuoteSnapshot(symbol: string): Promise<QuoteSnapshot | null> {
+  const { rows } = await dbQuery<QuoteRow>(
+    `SELECT * FROM stock_panel.quote_snapshots WHERE symbol = $1`,
+    [symbol.toUpperCase()],
+  )
+  const row = rows[0]
   return row ? mapQuote(row) : null
 }

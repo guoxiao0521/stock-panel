@@ -18,6 +18,11 @@ logs
 .fleet
 .idea
 
+# AI tooling / IDE (local)
+.agents/
+.cursor/
+plugins/
+
 # Local env files
 .env
 .env.*

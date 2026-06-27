@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const watchlistId = await resolveWatchlistId(event)
-  const existing = findItemById(id)
+  const existing = await findItemById(id)
   if (!existing || existing.watchlistId !== watchlistId) {
     throw createError({ statusCode: 404, message: '未找到该自选股条目' })
   }
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   if (typeof body.sortOrder === 'number')
     patch.sortOrder = body.sortOrder
 
-  const updated = updateWatchlistItem(id, patch)
+  const updated = await updateWatchlistItem(id, patch)
   if (!updated) {
     throw createError({ statusCode: 404, message: '未找到该自选股条目' })
   }

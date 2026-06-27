@@ -1,4 +1,4 @@
-// 前后端共用的领域类型，对应 PRD 第 11 节 SQLite 数据模型
+// 前后端共用的领域类型，对应 PRD 第 11 节数据模型
 
 /** 已认证用户（Google OAuth 登录后由 better-auth 管理） */
 export interface User {

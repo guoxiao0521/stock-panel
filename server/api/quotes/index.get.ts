@@ -1,5 +1,5 @@
 /** GET /api/quotes?symbols=AAPL,MSFT — 按 symbols 查询缓存行情 */
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const raw = typeof query.symbols === 'string' ? query.symbols : ''
   const symbols = raw
@@ -8,6 +8,6 @@ export default defineEventHandler((event) => {
     .filter(Boolean)
 
   return {
-    snapshots: getQuoteSnapshots(symbols),
+    snapshots: await getQuoteSnapshots(symbols),
   }
 })

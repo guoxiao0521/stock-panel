@@ -14,7 +14,7 @@ Stock Panel Phase 3 分析能力，方法论映射自 [finance-skills](https://g
 ```
 
 - **Route 层**：`server/api/analysis/run.post.ts`，仅做校验与 HTTP 错误转换。
-- **Service 层**：`server/utils/analysis-service.ts`，读取本地 SQLite 与 yahoo-finance2 数据。
+- **Service 层**：`server/utils/analysis-service.ts`，读取 Supabase Postgres 与 yahoo-finance2 数据。
 - **Runner 层**：`server/utils/analysis-runner.ts`，当前为 `template` runner（deterministic，无需 LLM）。
 - **类型契约**：`shared/types/index.ts` 中的 `AnalysisReport`、`RunAnalysisBody` 等。
 

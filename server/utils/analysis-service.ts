@@ -109,13 +109,13 @@ function computeRelativeStrength(
 
 async function resolveQuote(symbol: string, forceRefresh: boolean, watchlistId: string) {
   const dataGaps: string[] = []
-  let quote = getQuoteSnapshot(symbol)
+  let quote = await getQuoteSnapshot(symbol)
 
   if (forceRefresh || !quote || quote.error || !quote.fetchedAt) {
     try {
       const result = await fetchQuote(symbol)
-      upsertQuoteSnapshot(result.snapshot, result.raw ? JSON.stringify(result.raw) : null)
-      backfillItemMeta(watchlistId, symbol, result.meta)
+      await upsertQuoteSnapshot(result.snapshot, result.raw ? JSON.stringify(result.raw) : null)
+      await backfillItemMeta(watchlistId, symbol, result.meta)
       quote = result.snapshot
     }
     catch (e) {
@@ -192,12 +192,12 @@ export async function runStockAnalysis(body: RunAnalysisBody, watchlistId = DEFA
     }
   }
 
-  const macroMetrics = getMacroSnapshots(MACRO_SYMBOLS)
+  const macroMetrics = await getMacroSnapshots(MACRO_SYMBOLS)
   if (macroMetrics.every(m => m.value == null && m.error))
     dataGaps.push('宏观指标缺失')
 
   const marketContext = computeMarketContext(macroMetrics)
-  const watchlistItem = findItemBySymbol(watchlistId, symbol)
+  const watchlistItem = await findItemBySymbol(watchlistId, symbol)
 
   const context: AnalysisInputContext = {
     symbol,

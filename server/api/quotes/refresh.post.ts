@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
   const requested = (Array.isArray(body?.symbols) && body.symbols.length > 0
     ? body.symbols
-    : listWatchlistSymbols(watchlistId))
+    : await listWatchlistSymbols(watchlistId))
     .map(s => s.trim().toUpperCase())
     .filter(Boolean)
 
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     return { snapshots: [], refreshed: [] }
 
   const force = body?.force === true
-  const cached = new Map(getQuoteSnapshots(requested).map(q => [q.symbol, q]))
+  const cached = new Map((await getQuoteSnapshots(requested)).map(q => [q.symbol, q]))
   const now = Date.now()
 
   // 仅刷新缺失或已过期的快照（手动刷新 force 时全部刷新）
@@ -38,18 +38,18 @@ export default defineEventHandler(async (event) => {
     const results = await fetchQuotes(toFetch)
     for (const result of results) {
       if (result.snapshot.error === null) {
-        upsertQuoteSnapshot(result.snapshot, result.raw ? JSON.stringify(result.raw) : null)
-        backfillItemMeta(watchlistId, result.snapshot.symbol, result.meta)
+        await upsertQuoteSnapshot(result.snapshot, result.raw ? JSON.stringify(result.raw) : null)
+        await backfillItemMeta(watchlistId, result.snapshot.symbol, result.meta)
       }
       else {
         // 失败时保留旧快照，仅记录错误信息
-        recordQuoteError(result.snapshot.symbol, result.snapshot.error, result.snapshot.fetchedAt!)
+        await recordQuoteError(result.snapshot.symbol, result.snapshot.error, result.snapshot.fetchedAt!)
       }
     }
   }
 
   return {
-    snapshots: getQuoteSnapshots(requested),
+    snapshots: await getQuoteSnapshots(requested),
     refreshed: toFetch,
   }
 })

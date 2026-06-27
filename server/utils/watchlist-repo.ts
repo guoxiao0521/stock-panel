@@ -15,7 +15,7 @@ interface ItemRow {
   exchange: string | null
   currency: string | null
   note: string | null
-  tags_json: string
+  tags_json: unknown
   sort_order: number
   created_at: string
   updated_at: string
@@ -38,7 +38,11 @@ interface QuoteRow {
   error: string | null
 }
 
-function parseTags(json: string): string[] {
+function parseTags(json: unknown): string[] {
+  if (Array.isArray(json))
+    return json.filter(t => typeof t === 'string')
+  if (typeof json !== 'string')
+    return []
   try {
     const parsed = JSON.parse(json)
     return Array.isArray(parsed) ? parsed.filter(t => typeof t === 'string') : []
@@ -71,11 +75,11 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
     change: row.change,
     changePercent: row.change_percent,
     ytdChangePercent: row.ytd_change_percent,
-    volume: row.volume,
+    volume: row.volume == null ? null : Number(row.volume),
     turnoverRate: row.turnover_rate,
     trailingPe: row.trailing_pe,
     forwardPe: row.forward_pe,
-    marketCap: row.market_cap,
+    marketCap: row.market_cap == null ? null : Number(row.market_cap),
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,
@@ -84,20 +88,20 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
 }
 
 /** 列出列表内的自选股条目（含最近行情快照） */
-export function listWatchlistRows(watchlistId: string): WatchlistRow[] {
-  const db = useDatabase()
-  const items = db
-    .prepare(`SELECT * FROM watchlist_items WHERE watchlist_id = ? ORDER BY sort_order ASC, created_at ASC`)
-    .all(watchlistId) as ItemRow[]
+export async function listWatchlistRows(watchlistId: string): Promise<WatchlistRow[]> {
+  const { rows: items } = await dbQuery<ItemRow>(
+    `SELECT * FROM stock_panel.watchlist_items WHERE watchlist_id = $1 ORDER BY sort_order ASC, created_at ASC`,
+    [watchlistId],
+  )
 
   if (items.length === 0)
     return []
 
   const symbols = items.map(i => i.symbol)
-  const placeholders = symbols.map(() => '?').join(',')
-  const quotes = db
-    .prepare(`SELECT * FROM quote_snapshots WHERE symbol IN (${placeholders})`)
-    .all(...symbols) as QuoteRow[]
+  const { rows: quotes } = await dbQuery<QuoteRow>(
+    `SELECT * FROM stock_panel.quote_snapshots WHERE symbol = ANY($1::text[])`,
+    [symbols],
+  )
   const quoteMap = new Map(quotes.map(q => [q.symbol, mapQuote(q)]))
 
   return items.map(row => ({
@@ -106,60 +110,65 @@ export function listWatchlistRows(watchlistId: string): WatchlistRow[] {
   }))
 }
 
-export function findItemById(id: string): WatchlistItem | null {
-  const db = useDatabase()
-  const row = db.prepare(`SELECT * FROM watchlist_items WHERE id = ?`).get(id) as ItemRow | undefined
+export async function findItemById(id: string): Promise<WatchlistItem | null> {
+  const { rows } = await dbQuery<ItemRow>(
+    `SELECT * FROM stock_panel.watchlist_items WHERE id = $1`,
+    [id],
+  )
+  const row = rows[0]
   return row ? mapItem(row) : null
 }
 
-export function findItemBySymbol(watchlistId: string, symbol: string): WatchlistItem | null {
-  const db = useDatabase()
-  const row = db
-    .prepare(`SELECT * FROM watchlist_items WHERE watchlist_id = ? AND symbol = ?`)
-    .get(watchlistId, symbol.toUpperCase()) as ItemRow | undefined
+export async function findItemBySymbol(watchlistId: string, symbol: string): Promise<WatchlistItem | null> {
+  const { rows } = await dbQuery<ItemRow>(
+    `SELECT * FROM stock_panel.watchlist_items WHERE watchlist_id = $1 AND symbol = $2`,
+    [watchlistId, symbol.toUpperCase()],
+  )
+  const row = rows[0]
   return row ? mapItem(row) : null
 }
 
-export function createWatchlistItem(
+export async function createWatchlistItem(
   watchlistId: string,
   body: CreateWatchlistItemBody,
-): WatchlistItem {
-  const db = useDatabase()
+): Promise<WatchlistItem> {
   const symbol = body.symbol.trim().toUpperCase()
   const now = new Date().toISOString()
   const id = randomUUID()
 
-  const maxOrder = db
-    .prepare(`SELECT COALESCE(MAX(sort_order), -1) AS m FROM watchlist_items WHERE watchlist_id = ?`)
-    .get(watchlistId) as { m: number }
+  const { rows: orderRows } = await dbQuery<{ m: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) AS m FROM stock_panel.watchlist_items WHERE watchlist_id = $1`,
+    [watchlistId],
+  )
+  const maxOrder = Number(orderRows[0]?.m ?? -1)
 
-  db.prepare(
-    `INSERT INTO watchlist_items
+  await dbQuery(
+    `INSERT INTO stock_panel.watchlist_items
        (id, watchlist_id, symbol, name, exchange, currency, note, tags_json, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    watchlistId,
-    symbol,
-    body.name ?? null,
-    body.exchange ?? null,
-    body.currency ?? null,
-    null,
-    '[]',
-    maxOrder.m + 1,
-    now,
-    now,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)`,
+    [
+      id,
+      watchlistId,
+      symbol,
+      body.name ?? null,
+      body.exchange ?? null,
+      body.currency ?? null,
+      null,
+      '[]',
+      maxOrder + 1,
+      now,
+      now,
+    ],
   )
 
-  return findItemById(id)!
+  return (await findItemById(id))!
 }
 
-export function updateWatchlistItem(
+export async function updateWatchlistItem(
   id: string,
   body: UpdateWatchlistItemBody,
-): WatchlistItem | null {
-  const db = useDatabase()
-  const existing = findItemById(id)
+): Promise<WatchlistItem | null> {
+  const existing = await findItemById(id)
   if (!existing)
     return null
 
@@ -168,60 +177,65 @@ export function updateWatchlistItem(
   const sortOrder = body.sortOrder !== undefined ? body.sortOrder : existing.sortOrder
   const now = new Date().toISOString()
 
-  db.prepare(
-    `UPDATE watchlist_items
-       SET note = ?, tags_json = ?, sort_order = ?, updated_at = ?
-     WHERE id = ?`,
-  ).run(note, JSON.stringify(tags), sortOrder, now, id)
+  await dbQuery(
+    `UPDATE stock_panel.watchlist_items
+       SET note = $1, tags_json = $2::jsonb, sort_order = $3, updated_at = $4
+     WHERE id = $5`,
+    [note, JSON.stringify(tags), sortOrder, now, id],
+  )
 
   return findItemById(id)
 }
 
 /** 用 yahoo 行情回填公司名/交易所/币种（仅当本地为空时） */
-export function backfillItemMeta(
+export async function backfillItemMeta(
   watchlistId: string,
   symbol: string,
   meta: { name: string | null, exchange: string | null, currency: string | null },
-) {
-  const db = useDatabase()
-  db.prepare(
-    `UPDATE watchlist_items
-       SET name = COALESCE(name, ?),
-           exchange = COALESCE(exchange, ?),
-           currency = COALESCE(currency, ?),
-           updated_at = ?
-     WHERE watchlist_id = ? AND symbol = ?`,
-  ).run(meta.name, meta.exchange, meta.currency, new Date().toISOString(), watchlistId, symbol.toUpperCase())
+): Promise<void> {
+  await dbQuery(
+    `UPDATE stock_panel.watchlist_items
+       SET name = COALESCE(name, $1),
+           exchange = COALESCE(exchange, $2),
+           currency = COALESCE(currency, $3),
+           updated_at = $4
+     WHERE watchlist_id = $5 AND symbol = $6`,
+    [meta.name, meta.exchange, meta.currency, new Date().toISOString(), watchlistId, symbol.toUpperCase()],
+  )
 }
 
 /** 列出列表内全部 symbol */
-export function listWatchlistSymbols(watchlistId: string): string[] {
-  const db = useDatabase()
-  const rows = db
-    .prepare(`SELECT symbol FROM watchlist_items WHERE watchlist_id = ?`)
-    .all(watchlistId) as { symbol: string }[]
+export async function listWatchlistSymbols(watchlistId: string): Promise<string[]> {
+  const { rows } = await dbQuery<{ symbol: string }>(
+    `SELECT symbol FROM stock_panel.watchlist_items WHERE watchlist_id = $1`,
+    [watchlistId],
+  )
   return rows.map(r => r.symbol)
 }
 
-export function deleteWatchlistItem(id: string): boolean {
-  const db = useDatabase()
-  const result = db.prepare(`DELETE FROM watchlist_items WHERE id = ?`).run(id)
-  return result.changes > 0
+export async function deleteWatchlistItem(id: string): Promise<boolean> {
+  const result = await dbQuery(`DELETE FROM stock_panel.watchlist_items WHERE id = $1`, [id])
+  return result.rowCount > 0
 }
 
 /** 查找或建立用户专属自选股列表，返回其 ID */
-export function findOrCreateUserWatchlist(userId: string): string {
-  const db = useDatabase()
-  const row = db
-    .prepare(`SELECT id FROM watchlists WHERE user_id = ? LIMIT 1`)
-    .get(userId) as { id: string } | undefined
-  if (row)
-    return row.id
+export async function findOrCreateUserWatchlist(userId: string): Promise<string> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `SELECT id FROM stock_panel.watchlists WHERE user_id = $1 LIMIT 1`,
+    [userId],
+  )
+  if (rows[0])
+    return rows[0].id
 
   const id = randomUUID()
   const now = new Date().toISOString()
-  db.prepare(
-    `INSERT INTO watchlists (id, name, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, '我的自选股', userId, now, now)
-  return id
+  const result = await dbQuery<{ id: string }>(
+    `INSERT INTO stock_panel.watchlists (id, name, user_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id) WHERE user_id IS NOT NULL DO UPDATE
+       SET updated_at = stock_panel.watchlists.updated_at
+     RETURNING id`,
+    [id, '我的自选股', userId, now, now],
+  )
+  return result.rows[0]?.id ?? id
 }

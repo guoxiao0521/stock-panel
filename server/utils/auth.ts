@@ -7,7 +7,7 @@ export function useAuth() {
     return authInstance
 
   authInstance = betterAuth({
-    database: useDatabase(),
+    database: usePgPool(),
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL,
     socialProviders: {

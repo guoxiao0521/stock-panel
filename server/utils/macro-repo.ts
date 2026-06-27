@@ -10,11 +10,19 @@ interface MacroRow {
   fetched_at: string | null
   error: string | null
   error_at: string | null
-  raw_json: string | null
+  raw_json: unknown
 }
 
-function parseSpark(rawJson: string | null): number[] | null {
+function parseSpark(rawJson: unknown): number[] | null {
   if (!rawJson)
+    return null
+  if (typeof rawJson === 'object' && rawJson !== null) {
+    const parsed = rawJson as { spark?: unknown }
+    if (Array.isArray(parsed.spark) && parsed.spark.every(v => typeof v === 'number'))
+      return parsed.spark as number[]
+    return null
+  }
+  if (typeof rawJson !== 'string')
     return null
   try {
     const parsed = JSON.parse(rawJson) as { spark?: unknown }
@@ -43,15 +51,14 @@ function mapMacro(row: MacroRow): MacroMetricSnapshot {
 }
 
 /** 写入或更新一条宏观指标快照（每个 symbol 仅保留最新） */
-export function upsertMacroSnapshot(snapshot: MacroMetricSnapshot, raw?: unknown) {
-  const db = useDatabase()
+export async function upsertMacroSnapshot(snapshot: MacroMetricSnapshot, raw?: unknown): Promise<void> {
   const rawJson = JSON.stringify({ spark: snapshot.spark, raw: raw ?? null })
   // 成功写入时清空错误状态（error / error_at 置空）
-  db.prepare(
-    `INSERT INTO macro_metric_snapshots
+  await dbQuery(
+    `INSERT INTO stock_panel.macro_metric_snapshots
        (symbol, name, value, change, change_percent, quote_time, fetched_at, error, error_at, raw_json)
      VALUES
-       (@symbol, @name, @value, @change, @changePercent, @quoteTime, @fetchedAt, NULL, NULL, @rawJson)
+       ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, $8::jsonb)
      ON CONFLICT(symbol) DO UPDATE SET
        name = excluded.name,
        value = excluded.value,
@@ -62,16 +69,17 @@ export function upsertMacroSnapshot(snapshot: MacroMetricSnapshot, raw?: unknown
        error = NULL,
        error_at = NULL,
        raw_json = excluded.raw_json`,
-  ).run({
-    symbol: snapshot.symbol,
-    name: snapshot.name,
-    value: snapshot.value,
-    change: snapshot.change,
-    changePercent: snapshot.changePercent,
-    quoteTime: snapshot.quoteTime,
-    fetchedAt: snapshot.fetchedAt,
-    rawJson,
-  })
+    [
+      snapshot.symbol,
+      snapshot.name,
+      snapshot.value,
+      snapshot.change,
+      snapshot.changePercent,
+      snapshot.quoteTime,
+      snapshot.fetchedAt,
+      rawJson,
+    ],
+  )
 }
 
 /**
@@ -79,24 +87,23 @@ export function upsertMacroSnapshot(snapshot: MacroMetricSnapshot, raw?: unknown
  * 不更新 fetched_at（避免失败刷新让旧数据“看起来很新”），仅写入 error / error_at。
  * 若该 symbol 尚无快照，则插入一条仅含错误的占位记录。
  */
-export function recordMacroError(symbol: string, name: string, error: string, errorAt: string) {
-  const db = useDatabase()
-  db.prepare(
-    `INSERT INTO macro_metric_snapshots (symbol, name, error, error_at)
-     VALUES (?, ?, ?, ?)
+export async function recordMacroError(symbol: string, name: string, error: string, errorAt: string): Promise<void> {
+  await dbQuery(
+    `INSERT INTO stock_panel.macro_metric_snapshots (symbol, name, error, error_at)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT(symbol) DO UPDATE SET
        error = excluded.error,
        error_at = excluded.error_at`,
-  ).run(symbol, name, error, errorAt)
+    [symbol, name, error, errorAt],
+  )
 }
 
-export function getMacroSnapshots(symbols: string[]): MacroMetricSnapshot[] {
+export async function getMacroSnapshots(symbols: string[]): Promise<MacroMetricSnapshot[]> {
   if (symbols.length === 0)
     return []
-  const db = useDatabase()
-  const placeholders = symbols.map(() => '?').join(',')
-  const rows = db
-    .prepare(`SELECT * FROM macro_metric_snapshots WHERE symbol IN (${placeholders})`)
-    .all(...symbols) as MacroRow[]
+  const { rows } = await dbQuery<MacroRow>(
+    `SELECT * FROM stock_panel.macro_metric_snapshots WHERE symbol = ANY($1::text[])`,
+    [symbols],
+  )
   return rows.map(mapMacro)
 }

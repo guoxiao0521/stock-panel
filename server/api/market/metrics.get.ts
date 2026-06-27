@@ -2,8 +2,8 @@ import type { MacroMetricSnapshot } from '#shared/types'
 import { MACRO_METRICS, MACRO_SYMBOLS } from '../../utils/macro-config'
 
 /** GET /api/market/metrics — 获取宏观指标缓存快照（PRD 12.3） */
-export default defineEventHandler(() => {
-  const cached = new Map(getMacroSnapshots(MACRO_SYMBOLS).map(m => [m.symbol, m]))
+export default defineEventHandler(async () => {
+  const cached = new Map((await getMacroSnapshots(MACRO_SYMBOLS)).map(m => [m.symbol, m]))
 
   // 按配置顺序返回，缺失项用占位快照填充，保证前端卡片布局稳定
   const metrics: MacroMetricSnapshot[] = MACRO_METRICS.map(cfg =>

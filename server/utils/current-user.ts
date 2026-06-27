@@ -22,5 +22,5 @@ export async function requireCurrentSession(event: H3Event) {
  */
 export async function resolveWatchlistId(event: H3Event): Promise<string> {
   const session = await getCurrentSession(event)
-  return session ? findOrCreateUserWatchlist(session.user.id) : DEFAULT_WATCHLIST_ID
+  return session ? await findOrCreateUserWatchlist(session.user.id) : DEFAULT_WATCHLIST_ID
 }

@@ -10,8 +10,8 @@ interface RefreshBody {
 const CACHE_TTL_MS = 5 * 60 * 1000
 
 /** 按配置顺序返回，缺失项用占位快照填充 */
-function buildResponse(): MacroMetricSnapshot[] {
-  const cached = new Map(getMacroSnapshots(MACRO_SYMBOLS).map(m => [m.symbol, m]))
+async function buildResponse(): Promise<MacroMetricSnapshot[]> {
+  const cached = new Map((await getMacroSnapshots(MACRO_SYMBOLS)).map(m => [m.symbol, m]))
   return MACRO_METRICS.map(cfg =>
     cached.get(cfg.symbol) ?? {
       symbol: cfg.symbol,
@@ -59,11 +59,11 @@ export default defineEventHandler(async (event) => {
         message: `不支持的指标：${rejected.join(', ')}`,
       })
     }
-    return { metrics: buildResponse(), refreshed: [], failed: [], rejected }
+    return { metrics: await buildResponse(), refreshed: [], failed: [], rejected }
   }
 
   const force = body?.force === true
-  const cached = new Map(getMacroSnapshots(requested).map(m => [m.symbol, m]))
+  const cached = new Map((await getMacroSnapshots(requested)).map(m => [m.symbol, m]))
   const now = Date.now()
 
   // 仅刷新缺失或已过期的快照（手动刷新 force 时全部刷新）
@@ -81,12 +81,12 @@ export default defineEventHandler(async (event) => {
     const results = await fetchMacroMetrics(toFetch)
     for (const result of results) {
       if (result.snapshot.error === null) {
-        upsertMacroSnapshot(result.snapshot, result.raw)
+        await upsertMacroSnapshot(result.snapshot, result.raw)
       }
       else {
         // 失败时保留旧快照，仅记录错误信息（不更新 fetched_at）
         failed.push(result.snapshot.symbol)
-        recordMacroError(
+        await recordMacroError(
           result.snapshot.symbol,
           macroName(result.snapshot.symbol),
           result.snapshot.error,
@@ -97,7 +97,7 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    metrics: buildResponse(),
+    metrics: await buildResponse(),
     refreshed: toFetch,
     failed,
     rejected,

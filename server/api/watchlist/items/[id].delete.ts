@@ -8,12 +8,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const watchlistId = await resolveWatchlistId(event)
-  const existing = findItemById(id)
+  const existing = await findItemById(id)
   if (!existing || existing.watchlistId !== watchlistId) {
     throw createError({ statusCode: 404, message: '未找到该自选股条目' })
   }
 
-  const ok = deleteWatchlistItem(id)
+  const ok = await deleteWatchlistItem(id)
   if (!ok) {
     throw createError({ statusCode: 404, message: '未找到该自选股条目' })
   }

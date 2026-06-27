@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const watchlistId = await resolveWatchlistId(event)
-  if (findItemBySymbol(watchlistId, raw)) {
+  if (await findItemBySymbol(watchlistId, raw)) {
     throw createError({ statusCode: 409, message: `${raw} 已在自选股列表中` })
   }
 
@@ -28,14 +28,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: `无法找到美股代码 ${raw}` })
   }
 
-  const item = createWatchlistItem(watchlistId, {
+  const item = await createWatchlistItem(watchlistId, {
     symbol: raw,
     name: quoteResult.meta.name,
     exchange: quoteResult.meta.exchange,
     currency: quoteResult.meta.currency,
   })
 
-  upsertQuoteSnapshot(quoteResult.snapshot, JSON.stringify(quoteResult.raw))
+  await upsertQuoteSnapshot(quoteResult.snapshot, JSON.stringify(quoteResult.raw))
 
   setResponseStatus(event, 201)
   return { ...item, quote: quoteResult.snapshot }
