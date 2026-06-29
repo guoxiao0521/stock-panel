@@ -199,16 +199,18 @@ function priceActionSupportLevel(
   if (!cluster)
     return null
 
-  const rawHigh = Math.max(...cluster.map(t => t.value))
+  const clusterValues = cluster.map(t => t.value)
+  const rawHigh = Math.max(...clusterValues)
   const maCap = entries
     .filter((entry): entry is { name: string, value: number } =>
       entry.value != null && entry.value <= price && entry.value >= lowerBound && entry.value <= rawHigh + clusterThreshold)
     .sort((a, b) => b.value - a.value)[0]
-  const rangeHigh = maCap?.value ?? rawHigh
+  const rangeHigh = Math.max(rawHigh, maCap?.value ?? rawHigh)
   const closes = cluster
     .filter(t => t.kind === 'close' && t.value <= rangeHigh)
     .map(t => t.value)
-  const rangeLow = Math.min(...(closes.length > 0 ? closes : cluster.map(t => t.value)))
+  const priceActionLow = Math.min(...(closes.length > 0 ? closes : clusterValues))
+  const rangeLow = Math.min(priceActionLow, maCap?.value ?? priceActionLow)
   const maBasis = maCap ? `；${maCap.name} ${fmtLevel(maCap.value)} 附近提供均线参考` : ''
 
   return {
