@@ -49,6 +49,10 @@ export interface QuoteSnapshot {
   /** 预期市盈率 */
   forwardPe: number | null
   marketCap: number | null
+  /** ETF 净值（navPrice）；非 ETF 或缺失时为 null */
+  navPrice: number | null
+  /** ETF 折溢价百分比：(price - navPrice) / navPrice * 100；缺失时为 null */
+  premiumDiscountPercent: number | null
   quoteTime: string | null
   fetchedAt: string | null
   source: string | null

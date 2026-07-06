@@ -4,6 +4,7 @@ import { useIntervalFn, useStorage } from '@vueuse/core'
 import { AlertTriangleIcon, ListPlusIcon } from '@lucide/vue'
 import { onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import MacroMarketSection from '@/components/MacroMarketSection.vue'
 import StockDetailSheet from '@/components/StockDetailSheet.vue'
 import WatchlistTable from '@/components/WatchlistTable.vue'
 import WatchlistToolbar from '@/components/WatchlistToolbar.vue'
@@ -24,6 +25,16 @@ const {
   refresh,
 } = useWatchlist()
 
+const {
+  metrics,
+  summary,
+  error: marketError,
+  load: loadMarket,
+  refresh: refreshMarket,
+} = useMarket()
+
+const { series: indexSeries, load: loadIndices, start: startIndices } = useIntradayIndices()
+
 const { updatedAt, onRefresh } = useAppHeader()
 const { loggedIn } = useAuthState()
 
@@ -41,7 +52,7 @@ const autoRefresh = useStorage('stock-panel-auto-refresh', false)
 
 const { pause, resume } = useIntervalFn(
   async () => {
-    await refresh(false)
+    await Promise.all([refresh(false), refreshMarket(false)])
     updatedAt.value = new Date().toISOString()
   },
   AUTO_REFRESH_MS,
@@ -113,31 +124,48 @@ async function onUpdateTags(id: string, tags: string[]) {
   }
 }
 
-// 登录态变化时重新加载列表（登录→个人列表，退出→默认列表）
+// 登录态变化时强制重新加载列表（登录→个人列表，退出→默认列表）
 watch(loggedIn, async () => {
-  await load()
+  await load(true)
   await refresh(false)
   updatedAt.value = new Date().toISOString()
 })
 
-// 注册顶部刷新按钮的行为（手动刷新忽略缓存）
+// 注册顶部刷新按钮（手动刷新：自选股行情 + 宏观指标 + 指数走势同时刷新）
 onRefresh(async () => {
-  await refresh(true)
+  const [, marketResult] = await Promise.all([refresh(true), refreshMarket(true), loadIndices()])
   updatedAt.value = new Date().toISOString()
-  toast.success('行情已刷新')
+  if (!marketResult.ok)
+    toast.error('刷新宏观指标失败')
+  else if (marketResult.failed.length > 0)
+    toast.warning(`部分指标刷新失败：${marketResult.failed.join('、')}，已保留旧数据`)
+  else
+    toast.success('行情已刷新')
 })
 
 onMounted(async () => {
+  // 主要指数当日走势：首屏拉取并启动盘中自动轮询
+  startIndices()
   // 首屏优先展示缓存，再异步刷新过期行情（PRD 15）
-  await load()
+  await Promise.all([load(), loadMarket()])
   updatedAt.value = new Date().toISOString()
-  await refresh(false)
+  const [, marketResult] = await Promise.all([refresh(false), refreshMarket(false)])
   updatedAt.value = new Date().toISOString()
+  if (marketResult.ok && marketResult.failed.length > 0)
+    toast.warning(`部分指标刷新失败：${marketResult.failed.join('、')}，已保留旧数据`)
 })
 </script>
 
 <template>
   <div class="mx-auto max-w-screen-2xl space-y-4 px-4 py-6 lg:px-6">
+    <!-- 宏观市场概览（可折叠） -->
+    <MacroMarketSection
+      :metrics="metrics"
+      :summary="summary"
+      :index-series="indexSeries"
+      :error="marketError"
+    />
+
     <div>
       <h1 class="text-xl font-semibold tracking-tight">自选股</h1>
       <p class="text-sm text-muted-foreground">

@@ -120,6 +120,8 @@ const metrics = computed(() => {
   const q = props.row?.quote
   return [
     { label: '最新价', value: formatPrice(q?.price) },
+    { label: '净值', value: formatPrice(q?.navPrice) },
+    { label: '折溢价', value: formatPercent(q?.premiumDiscountPercent), tone: q?.premiumDiscountPercent },
     { label: '日涨跌幅', value: formatPercent(q?.changePercent), tone: q?.changePercent },
     { label: '年初至今', value: formatPercent(q?.ytdChangePercent), tone: q?.ytdChangePercent },
     { label: '市值', value: formatCompact(q?.marketCap) },

@@ -7,6 +7,12 @@ import { computed, ref } from 'vue'
  * TODO(Milestone 3): refresh 接入 /api/quotes/refresh 拉取实时行情。
  */
 
+// 模块级缓存：跨路由切换保持数据，避免每次挂载重新请求
+const items = ref<WatchlistRow[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+let initialized = false
+
 function getSortValue(row: WatchlistRow, key: SortKey): number | string | null {
   switch (key) {
     case 'changePercent':
@@ -26,12 +32,10 @@ function getSortValue(row: WatchlistRow, key: SortKey): number | string | null {
 }
 
 export function useWatchlist() {
-  const items = ref<WatchlistRow[]>([])
+  // UI 状态保持实例级（路由切换后重置搜索/排序符合预期）
   const search = ref('')
   const sortKey = ref<SortKey>('manual')
   const sortDirection = ref<SortDirection>('desc')
-  const loading = ref(false)
-  const error = ref<string | null>(null)
 
   const filtered = computed<WatchlistRow[]>(() => {
     const keyword = search.value.trim().toLowerCase()
@@ -70,12 +74,15 @@ export function useWatchlist() {
     return items.value.some(item => item.symbol === upper)
   }
 
-  async function load() {
+  async function load(force = false) {
+    if (initialized && !force)
+      return
     loading.value = true
     error.value = null
     try {
       const data = await $fetch('/api/watchlist')
       items.value = data.items
+      initialized = true
     }
     catch {
       error.value = '加载自选股失败'

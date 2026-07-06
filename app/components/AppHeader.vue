@@ -19,7 +19,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/', label: '自选股' },
-  { to: '/market', label: '宏观市场', phase: 'P2' },
   { to: '/analysis', label: 'AI 分析', phase: 'P3' },
 ]
 

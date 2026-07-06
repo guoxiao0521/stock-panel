@@ -32,6 +32,8 @@ interface QuoteRow {
   trailing_pe: number | null
   forward_pe: number | null
   market_cap: number | null
+  nav_price: number | null
+  premium_discount_percent: number | null
   quote_time: string | null
   fetched_at: string | null
   source: string | null
@@ -80,6 +82,8 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
     trailingPe: row.trailing_pe,
     forwardPe: row.forward_pe,
     marketCap: row.market_cap == null ? null : Number(row.market_cap),
+    navPrice: row.nav_price,
+    premiumDiscountPercent: row.premium_discount_percent,
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,

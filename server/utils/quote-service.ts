@@ -31,6 +31,13 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
+/** ETF 折溢价：(price - nav) / nav * 100 */
+function calcPremiumDiscountPercent(price: number | null, navPrice: number | null): number | null {
+  if (price == null || navPrice == null || navPrice === 0)
+    return null
+  return ((price - navPrice) / navPrice) * 100
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), ms)
@@ -55,6 +62,26 @@ async function fetchYtd(symbol: string, price: number | null): Promise<number | 
     if (firstClose == null || firstClose === 0)
       return null
     return ((price - firstClose) / firstClose) * 100
+  }
+  catch {
+    return null
+  }
+}
+
+/** ETF 净值：优先 quote.navPrice，ETF 缺失时 fallback quoteSummary.summaryDetail */
+async function fetchNavPrice(symbol: string, q: { navPrice?: unknown, quoteType?: string }): Promise<number | null> {
+  const direct = num(q.navPrice)
+  if (direct != null)
+    return direct
+  if (q.quoteType !== 'ETF' && q.quoteType !== 'MUTUALFUND')
+    return null
+  try {
+    const summary = await withTimeout(
+      yf.quoteSummary(symbol, { modules: ['summaryDetail'] }),
+      QUOTE_DETAIL_TIMEOUT_MS,
+      'NAV',
+    )
+    return num(summary.summaryDetail?.navPrice)
   }
   catch {
     return null
@@ -86,9 +113,10 @@ export async function fetchQuote(symbol: string): Promise<QuoteResult> {
   const price = num(q.regularMarketPrice)
   const volume = num(q.regularMarketVolume)
 
-  const [ytd, floatShares] = await Promise.all([
+  const [ytd, floatShares, navPrice] = await Promise.all([
     fetchYtd(sym, price),
     fetchFloatShares(sym),
+    fetchNavPrice(sym, q),
   ])
 
   // 换手率：优先 floatShares，否则 sharesOutstanding
@@ -109,6 +137,8 @@ export async function fetchQuote(symbol: string): Promise<QuoteResult> {
     trailingPe: num(q.trailingPE),
     forwardPe: num(q.forwardPE),
     marketCap: num(q.marketCap),
+    navPrice,
+    premiumDiscountPercent: calcPremiumDiscountPercent(price, navPrice),
     quoteTime: q.regularMarketTime ? new Date(q.regularMarketTime).toISOString() : null,
     fetchedAt: now,
     source: 'yahoo-finance2',
@@ -190,6 +220,8 @@ export async function fetchQuotes(symbols: string[]): Promise<QuoteResult[]> {
           trailingPe: null,
           forwardPe: null,
           marketCap: null,
+          navPrice: null,
+          premiumDiscountPercent: null,
           quoteTime: null,
           fetchedAt: new Date().toISOString(),
           source: 'yahoo-finance2',

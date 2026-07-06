@@ -11,6 +11,8 @@ interface QuoteRow {
   trailing_pe: number | null
   forward_pe: number | null
   market_cap: number | null
+  nav_price: number | null
+  premium_discount_percent: number | null
   quote_time: string | null
   fetched_at: string | null
   source: string | null
@@ -29,6 +31,8 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
     trailingPe: row.trailing_pe,
     forwardPe: row.forward_pe,
     marketCap: row.market_cap == null ? null : Number(row.market_cap),
+    navPrice: row.nav_price,
+    premiumDiscountPercent: row.premium_discount_percent,
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,
@@ -41,10 +45,11 @@ export async function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: str
   await dbQuery(
     `INSERT INTO stock_panel.quote_snapshots
        (symbol, price, change, change_percent, ytd_change_percent, volume, turnover_rate,
-        trailing_pe, forward_pe, market_cap, quote_time, fetched_at, source, error, raw_json)
+        trailing_pe, forward_pe, market_cap, nav_price, premium_discount_percent,
+        quote_time, fetched_at, source, error, raw_json)
      VALUES
        ($1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
+        $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb)
      ON CONFLICT(symbol) DO UPDATE SET
        price = excluded.price,
        change = excluded.change,
@@ -55,6 +60,8 @@ export async function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: str
        trailing_pe = excluded.trailing_pe,
        forward_pe = excluded.forward_pe,
        market_cap = excluded.market_cap,
+       nav_price = excluded.nav_price,
+       premium_discount_percent = excluded.premium_discount_percent,
        quote_time = excluded.quote_time,
        fetched_at = excluded.fetched_at,
        source = excluded.source,
@@ -71,6 +78,8 @@ export async function upsertQuoteSnapshot(snapshot: QuoteSnapshot, rawJson?: str
       snapshot.trailingPe,
       snapshot.forwardPe,
       snapshot.marketCap,
+      snapshot.navPrice,
+      snapshot.premiumDiscountPercent,
       snapshot.quoteTime,
       snapshot.fetchedAt,
       snapshot.source,

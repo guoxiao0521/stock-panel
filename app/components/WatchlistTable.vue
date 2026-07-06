@@ -48,6 +48,8 @@ function turnover(value: number | null | undefined): string {
           <TableHead class="sticky left-0 z-10 bg-muted/50">代码</TableHead>
           <TableHead>名称</TableHead>
           <TableHead class="text-right">最新价</TableHead>
+          <TableHead class="text-right">净值</TableHead>
+          <TableHead class="text-right">折溢价</TableHead>
           <TableHead class="text-right">日涨跌额</TableHead>
           <TableHead class="text-right">日涨跌幅</TableHead>
           <TableHead class="text-right">年初至今</TableHead>
@@ -83,6 +85,12 @@ function turnover(value: number | null | undefined): string {
           <TableCell class="text-right tabular-nums">
             <Skeleton v-if="loading && !row.quote" class="ml-auto h-4 w-12" />
             <template v-else>{{ formatPrice(row.quote?.price) }}</template>
+          </TableCell>
+          <TableCell class="text-right tabular-nums">
+            {{ formatPrice(row.quote?.navPrice) }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums" :class="changeColorClass(row.quote?.premiumDiscountPercent)">
+            {{ formatPercent(row.quote?.premiumDiscountPercent) }}
           </TableCell>
           <TableCell class="text-right tabular-nums" :class="changeColorClass(row.quote?.change)">
             {{ formatChange(row.quote?.change) }}
