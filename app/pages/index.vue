@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import type { WatchlistRow } from '#shared/types'
 import { useIntervalFn, useStorage } from '@vueuse/core'
 import { AlertTriangleIcon, ListPlusIcon } from '@lucide/vue'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import MacroMarketSection from '@/components/MacroMarketSection.vue'
-import StockDetailSheet from '@/components/StockDetailSheet.vue'
 import WatchlistTable from '@/components/WatchlistTable.vue'
 import WatchlistToolbar from '@/components/WatchlistToolbar.vue'
 
@@ -20,8 +18,6 @@ const {
   load,
   add,
   remove,
-  updateNote,
-  updateTags,
   refresh,
 } = useWatchlist()
 
@@ -42,9 +38,6 @@ interface AddSymbolDialogControls {
   resolve: () => void
   reject: (message: string) => void
 }
-
-const selected = ref<WatchlistRow | null>(null)
-const detailOpen = ref(false)
 
 // 自动刷新偏好持久化，间隔 5 分钟（PRD 7.1）
 const AUTO_REFRESH_MS = 5 * 60 * 1000
@@ -91,11 +84,6 @@ async function onAdd(symbol: string, controls?: AddSymbolDialogControls) {
   }
 }
 
-function onSelect(row: WatchlistRow) {
-  selected.value = row
-  detailOpen.value = true
-}
-
 async function onRemove(id: string) {
   try {
     await remove(id)
@@ -103,24 +91,6 @@ async function onRemove(id: string) {
   }
   catch (e) {
     toast.error(errMessage(e, '移除失败'))
-  }
-}
-
-async function onUpdateNote(id: string, note: string) {
-  try {
-    await updateNote(id, note)
-  }
-  catch (e) {
-    toast.error(errMessage(e, '备注保存失败'))
-  }
-}
-
-async function onUpdateTags(id: string, tags: string[]) {
-  try {
-    await updateTags(id, tags)
-  }
-  catch (e) {
-    toast.error(errMessage(e, '标签保存失败'))
   }
 }
 
@@ -195,7 +165,6 @@ onMounted(async () => {
       v-if="filtered.length > 0"
       :rows="filtered"
       :loading="loading"
-      @select="onSelect"
       @remove="onRemove"
     />
 
@@ -211,13 +180,5 @@ onMounted(async () => {
         </p>
       </div>
     </div>
-
-    <StockDetailSheet
-      v-model:open="detailOpen"
-      :row="selected"
-      @update-note="onUpdateNote"
-      @update-tags="onUpdateTags"
-      @remove="onRemove"
-    />
   </div>
 </template>

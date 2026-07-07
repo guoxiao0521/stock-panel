@@ -1,4 +1,4 @@
-import type { QuoteSnapshot, SortDirection, SortKey, WatchlistRow } from '#shared/types'
+import type { QuoteSnapshot, SortDirection, SortKey, WatchlistItem, WatchlistRow } from '#shared/types'
 import { computed, ref } from 'vue'
 
 /**
@@ -124,12 +124,28 @@ export function useWatchlist() {
     patchLocal(id, updated)
   }
 
-  function patchLocal(id: string, updated: { note: string | null, tags: string[], updatedAt: string }) {
-    const item = items.value.find(i => i.id === id)
-    if (item) {
-      item.note = updated.note
-      item.tags = updated.tags
-      item.updatedAt = updated.updatedAt
+  async function updateHolding(id: string, costPrice: number | null, shareCount: number | null) {
+    const updated = await $fetch(`/api/watchlist/items/${id}`, {
+      method: 'PATCH',
+      body: { costPrice, shareCount },
+    })
+    patchLocal(id, updated)
+  }
+
+  function patchLocal(id: string, updated: Partial<WatchlistItem> & Pick<WatchlistItem, 'updatedAt'>) {
+    const index = items.value.findIndex(i => i.id === id)
+    if (index === -1)
+      return
+
+    const current = items.value[index]!
+    items.value[index] = {
+      ...current,
+      note: updated.note !== undefined ? updated.note : current.note,
+      tags: updated.tags !== undefined ? updated.tags : current.tags,
+      costPrice: updated.costPrice !== undefined ? updated.costPrice : current.costPrice,
+      shareCount: updated.shareCount !== undefined ? updated.shareCount : current.shareCount,
+      sortOrder: updated.sortOrder !== undefined ? updated.sortOrder : current.sortOrder,
+      updatedAt: updated.updatedAt,
     }
   }
 
@@ -177,6 +193,7 @@ export function useWatchlist() {
     remove,
     updateNote,
     updateTags,
+    updateHolding,
     refresh,
   }
 }

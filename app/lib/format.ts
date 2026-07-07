@@ -33,6 +33,27 @@ export function formatChange(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)}`
 }
 
+/** 带千分位的金额变动：保留 2 位小数并带正负号 */
+export function formatSignedPrice(value: number | null | undefined): string {
+  if (isMissing(value))
+    return DASH
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+/** 持股数：最多保留 6 位小数，隐藏无意义尾零 */
+export function formatShares(value: number | null | undefined): string {
+  if (isMissing(value))
+    return DASH
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  })
+}
+
 /** 市盈率：保留 2 位小数 */
 export function formatPe(value: number | null | undefined): string {
   if (isMissing(value))

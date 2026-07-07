@@ -28,6 +28,8 @@ export interface WatchlistItem {
   currency: string | null
   note: string | null
   tags: string[]
+  costPrice: number | null
+  shareCount: number | null
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -160,6 +162,8 @@ export interface CreateWatchlistItemBody {
 export interface UpdateWatchlistItemBody {
   note?: string | null
   tags?: string[]
+  costPrice?: number | null
+  shareCount?: number | null
   sortOrder?: number
 }
 

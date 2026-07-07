@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 
+const route = useRoute()
 const { items, load: loadWatchlist } = useWatchlist()
 const {
   selectedSymbol,
@@ -54,7 +55,10 @@ async function handleRun() {
 
 onMounted(async () => {
   await loadWatchlist()
-  if (symbolOptions.value.length > 0 && !selectedSymbol.value)
+  const querySymbol = route.query.symbol
+  if (typeof querySymbol === 'string' && querySymbol.trim())
+    selectedSymbol.value = querySymbol.trim().toUpperCase()
+  else if (symbolOptions.value.length > 0 && !selectedSymbol.value)
     selectedSymbol.value = symbolOptions.value[0]!.value
 })
 </script>

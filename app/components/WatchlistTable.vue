@@ -21,7 +21,10 @@ import {
   formatPe,
   formatPercent,
   formatPrice,
+  formatShares,
+  formatSignedPrice,
 } from '@/lib/format'
+import { calculateHoldingMetrics } from '@/lib/holding'
 
 defineProps<{
   rows: WatchlistRow[]
@@ -29,7 +32,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [row: WatchlistRow]
   remove: [id: string]
 }>()
 
@@ -48,6 +50,11 @@ function turnover(value: number | null | undefined): string {
           <TableHead class="sticky left-0 z-10 bg-muted/50">代码</TableHead>
           <TableHead>名称</TableHead>
           <TableHead class="text-right">最新价</TableHead>
+          <TableHead class="text-right">成本价</TableHead>
+          <TableHead class="text-right">持股数</TableHead>
+          <TableHead class="text-right">持仓市值</TableHead>
+          <TableHead class="text-right">浮动盈亏</TableHead>
+          <TableHead class="text-right">盈亏率</TableHead>
           <TableHead class="text-right">净值</TableHead>
           <TableHead class="text-right">折溢价</TableHead>
           <TableHead class="text-right">日涨跌额</TableHead>
@@ -67,7 +74,7 @@ function turnover(value: number | null | undefined): string {
           v-for="row in rows"
           :key="row.id"
           class="cursor-pointer"
-          @click="emit('select', row)"
+          @click="navigateTo(`/stock/${row.symbol}`)"
         >
           <TableCell class="sticky left-0 z-10 bg-background font-medium">
             <div class="flex items-center gap-1">
@@ -85,6 +92,21 @@ function turnover(value: number | null | undefined): string {
           <TableCell class="text-right tabular-nums">
             <Skeleton v-if="loading && !row.quote" class="ml-auto h-4 w-12" />
             <template v-else>{{ formatPrice(row.quote?.price) }}</template>
+          </TableCell>
+          <TableCell class="text-right tabular-nums">
+            {{ formatPrice(row.costPrice) }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums">
+            {{ formatShares(row.shareCount) }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums">
+            {{ formatPrice(calculateHoldingMetrics(row).marketValue) }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnl)">
+            {{ formatSignedPrice(calculateHoldingMetrics(row).unrealizedPnl) }}
+          </TableCell>
+          <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnlPercent)">
+            {{ formatPercent(calculateHoldingMetrics(row).unrealizedPnlPercent) }}
           </TableCell>
           <TableCell class="text-right tabular-nums">
             {{ formatPrice(row.quote?.navPrice) }}

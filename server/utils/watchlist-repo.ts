@@ -16,6 +16,8 @@ interface ItemRow {
   currency: string | null
   note: string | null
   tags_json: unknown
+  cost_price: string | number | null
+  share_count: string | number | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -23,17 +25,17 @@ interface ItemRow {
 
 interface QuoteRow {
   symbol: string
-  price: number | null
-  change: number | null
-  change_percent: number | null
-  ytd_change_percent: number | null
-  volume: number | null
-  turnover_rate: number | null
-  trailing_pe: number | null
-  forward_pe: number | null
-  market_cap: number | null
-  nav_price: number | null
-  premium_discount_percent: number | null
+  price: string | number | null
+  change: string | number | null
+  change_percent: string | number | null
+  ytd_change_percent: string | number | null
+  volume: string | number | null
+  turnover_rate: string | number | null
+  trailing_pe: string | number | null
+  forward_pe: string | number | null
+  market_cap: string | number | null
+  nav_price: string | number | null
+  premium_discount_percent: string | number | null
   quote_time: string | null
   fetched_at: string | null
   source: string | null
@@ -54,6 +56,13 @@ function parseTags(json: unknown): string[] {
   }
 }
 
+function parseNullableNumber(value: string | number | null): number | null {
+  if (value === null)
+    return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function mapItem(row: ItemRow): WatchlistItem {
   return {
     id: row.id,
@@ -64,6 +73,8 @@ function mapItem(row: ItemRow): WatchlistItem {
     currency: row.currency,
     note: row.note,
     tags: parseTags(row.tags_json),
+    costPrice: parseNullableNumber(row.cost_price),
+    shareCount: parseNullableNumber(row.share_count),
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -73,17 +84,17 @@ function mapItem(row: ItemRow): WatchlistItem {
 function mapQuote(row: QuoteRow): QuoteSnapshot {
   return {
     symbol: row.symbol,
-    price: row.price,
-    change: row.change,
-    changePercent: row.change_percent,
-    ytdChangePercent: row.ytd_change_percent,
-    volume: row.volume == null ? null : Number(row.volume),
-    turnoverRate: row.turnover_rate,
-    trailingPe: row.trailing_pe,
-    forwardPe: row.forward_pe,
-    marketCap: row.market_cap == null ? null : Number(row.market_cap),
-    navPrice: row.nav_price,
-    premiumDiscountPercent: row.premium_discount_percent,
+    price: parseNullableNumber(row.price),
+    change: parseNullableNumber(row.change),
+    changePercent: parseNullableNumber(row.change_percent),
+    ytdChangePercent: parseNullableNumber(row.ytd_change_percent),
+    volume: parseNullableNumber(row.volume),
+    turnoverRate: parseNullableNumber(row.turnover_rate),
+    trailingPe: parseNullableNumber(row.trailing_pe),
+    forwardPe: parseNullableNumber(row.forward_pe),
+    marketCap: parseNullableNumber(row.market_cap),
+    navPrice: parseNullableNumber(row.nav_price),
+    premiumDiscountPercent: parseNullableNumber(row.premium_discount_percent),
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,
@@ -178,14 +189,21 @@ export async function updateWatchlistItem(
 
   const note = body.note !== undefined ? body.note : existing.note
   const tags = body.tags !== undefined ? body.tags : existing.tags
+  const costPrice = body.costPrice !== undefined ? body.costPrice : existing.costPrice
+  const shareCount = body.shareCount !== undefined ? body.shareCount : existing.shareCount
   const sortOrder = body.sortOrder !== undefined ? body.sortOrder : existing.sortOrder
   const now = new Date().toISOString()
 
   await dbQuery(
     `UPDATE stock_panel.watchlist_items
-       SET note = $1, tags_json = $2::jsonb, sort_order = $3, updated_at = $4
-     WHERE id = $5`,
-    [note, JSON.stringify(tags), sortOrder, now, id],
+       SET note = $1,
+           tags_json = $2::jsonb,
+           cost_price = $3,
+           share_count = $4,
+           sort_order = $5,
+           updated_at = $6
+     WHERE id = $7`,
+    [note, JSON.stringify(tags), costPrice, shareCount, sortOrder, now, id],
   )
 
   return findItemById(id)

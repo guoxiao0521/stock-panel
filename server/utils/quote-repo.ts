@@ -2,37 +2,44 @@ import type { QuoteSnapshot } from '#shared/types'
 
 interface QuoteRow {
   symbol: string
-  price: number | null
-  change: number | null
-  change_percent: number | null
-  ytd_change_percent: number | null
-  volume: number | null
-  turnover_rate: number | null
-  trailing_pe: number | null
-  forward_pe: number | null
-  market_cap: number | null
-  nav_price: number | null
-  premium_discount_percent: number | null
+  price: string | number | null
+  change: string | number | null
+  change_percent: string | number | null
+  ytd_change_percent: string | number | null
+  volume: string | number | null
+  turnover_rate: string | number | null
+  trailing_pe: string | number | null
+  forward_pe: string | number | null
+  market_cap: string | number | null
+  nav_price: string | number | null
+  premium_discount_percent: string | number | null
   quote_time: string | null
   fetched_at: string | null
   source: string | null
   error: string | null
 }
 
+function parseNullableNumber(value: string | number | null): number | null {
+  if (value === null)
+    return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function mapQuote(row: QuoteRow): QuoteSnapshot {
   return {
     symbol: row.symbol,
-    price: row.price,
-    change: row.change,
-    changePercent: row.change_percent,
-    ytdChangePercent: row.ytd_change_percent,
-    volume: row.volume == null ? null : Number(row.volume),
-    turnoverRate: row.turnover_rate,
-    trailingPe: row.trailing_pe,
-    forwardPe: row.forward_pe,
-    marketCap: row.market_cap == null ? null : Number(row.market_cap),
-    navPrice: row.nav_price,
-    premiumDiscountPercent: row.premium_discount_percent,
+    price: parseNullableNumber(row.price),
+    change: parseNullableNumber(row.change),
+    changePercent: parseNullableNumber(row.change_percent),
+    ytdChangePercent: parseNullableNumber(row.ytd_change_percent),
+    volume: parseNullableNumber(row.volume),
+    turnoverRate: parseNullableNumber(row.turnover_rate),
+    trailingPe: parseNullableNumber(row.trailing_pe),
+    forwardPe: parseNullableNumber(row.forward_pe),
+    marketCap: parseNullableNumber(row.market_cap),
+    navPrice: parseNullableNumber(row.nav_price),
+    premiumDiscountPercent: parseNullableNumber(row.premium_discount_percent),
     quoteTime: row.quote_time,
     fetchedAt: row.fetched_at,
     source: row.source,

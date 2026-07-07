@@ -139,6 +139,6 @@ onBeforeUnmount(() => {
         {{ cfg.label }}
       </button>
     </div>
-    <div ref="container" class="h-64 w-full" />
+    <div ref="container" class="h-[28rem] w-full" />
   </div>
 </template>
