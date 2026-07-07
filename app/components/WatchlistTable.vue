@@ -18,13 +18,13 @@ import {
   formatChange,
   formatCompact,
   formatDateTime,
+  formatMoney,
   formatPe,
   formatPercent,
-  formatPrice,
   formatShares,
-  formatSignedPrice,
+  formatSignedMoney,
 } from '@/lib/format'
-import { calculateHoldingMetrics } from '@/lib/holding'
+import { calculateHoldingMetrics, resolveHoldingCurrency } from '@/lib/holding'
 
 defineProps<{
   rows: WatchlistRow[]
@@ -91,25 +91,25 @@ function turnover(value: number | null | undefined): string {
           </TableCell>
           <TableCell class="text-right tabular-nums">
             <Skeleton v-if="loading && !row.quote" class="ml-auto h-4 w-12" />
-            <template v-else>{{ formatPrice(row.quote?.price) }}</template>
+            <template v-else>{{ formatMoney(row.quote?.price, resolveHoldingCurrency(row)) }}</template>
           </TableCell>
           <TableCell class="text-right tabular-nums">
-            {{ formatPrice(row.costPrice) }}
+            {{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }}
           </TableCell>
           <TableCell class="text-right tabular-nums">
             {{ formatShares(row.shareCount) }}
           </TableCell>
           <TableCell class="text-right tabular-nums">
-            {{ formatPrice(calculateHoldingMetrics(row).marketValue) }}
+            {{ formatMoney(calculateHoldingMetrics(row).marketValue, resolveHoldingCurrency(row)) }}
           </TableCell>
           <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnl)">
-            {{ formatSignedPrice(calculateHoldingMetrics(row).unrealizedPnl) }}
+            {{ formatSignedMoney(calculateHoldingMetrics(row).unrealizedPnl, resolveHoldingCurrency(row)) }}
           </TableCell>
           <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnlPercent)">
             {{ formatPercent(calculateHoldingMetrics(row).unrealizedPnlPercent) }}
           </TableCell>
           <TableCell class="text-right tabular-nums">
-            {{ formatPrice(row.quote?.navPrice) }}
+            {{ formatMoney(row.quote?.navPrice, resolveHoldingCurrency(row)) }}
           </TableCell>
           <TableCell class="text-right tabular-nums" :class="changeColorClass(row.quote?.premiumDiscountPercent)">
             {{ formatPercent(row.quote?.premiumDiscountPercent) }}

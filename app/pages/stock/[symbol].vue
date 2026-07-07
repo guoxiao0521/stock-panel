@@ -14,13 +14,13 @@ import {
   DASH,
   formatCompact,
   formatDateTime,
+  formatMoney,
   formatPercent,
   formatPe,
-  formatPrice,
   formatShares,
-  formatSignedPrice,
+  formatSignedMoney,
 } from '@/lib/format'
-import { calculateHoldingMetrics } from '@/lib/holding'
+import { calculateHoldingMetrics, resolveHoldingCurrency } from '@/lib/holding'
 
 const route = useRoute()
 const symbol = computed(() => String(route.params.symbol ?? '').toUpperCase())
@@ -176,9 +176,10 @@ async function handleRemove() {
 
 const metrics = computed(() => {
   const q = row.value?.quote
+  const currency = resolveHoldingCurrency(row.value)
   return [
-    { label: '最新价', value: formatPrice(q?.price) },
-    { label: '净值', value: formatPrice(q?.navPrice) },
+    { label: '最新价', value: formatMoney(q?.price, currency) },
+    { label: '净值', value: formatMoney(q?.navPrice, currency) },
     { label: '折溢价', value: formatPercent(q?.premiumDiscountPercent), tone: q?.premiumDiscountPercent },
     { label: '日涨跌幅', value: formatPercent(q?.changePercent), tone: q?.changePercent },
     { label: '年初至今', value: formatPercent(q?.ytdChangePercent), tone: q?.ytdChangePercent },
@@ -190,19 +191,22 @@ const metrics = computed(() => {
 
 const holdingMetrics = computed(() => calculateHoldingMetrics(row.value))
 
-const holdingSummary = computed(() => [
-  { label: '持仓市值', value: formatPrice(holdingMetrics.value.marketValue) },
-  {
-    label: '浮动盈亏',
-    value: formatSignedPrice(holdingMetrics.value.unrealizedPnl),
-    tone: holdingMetrics.value.unrealizedPnl,
-  },
-  {
-    label: '盈亏率',
-    value: formatPercent(holdingMetrics.value.unrealizedPnlPercent),
-    tone: holdingMetrics.value.unrealizedPnlPercent,
-  },
-])
+const holdingSummary = computed(() => {
+  const currency = resolveHoldingCurrency(row.value)
+  return [
+    { label: '持仓市值', value: formatMoney(holdingMetrics.value.marketValue, currency) },
+    {
+      label: '浮动盈亏',
+      value: formatSignedMoney(holdingMetrics.value.unrealizedPnl, currency),
+      tone: holdingMetrics.value.unrealizedPnl,
+    },
+    {
+      label: '盈亏率',
+      value: formatPercent(holdingMetrics.value.unrealizedPnlPercent),
+      tone: holdingMetrics.value.unrealizedPnlPercent,
+    },
+  ]
+})
 </script>
 
 <template>
@@ -331,7 +335,7 @@ const holdingSummary = computed(() => [
               </div>
             </div>
             <p class="text-xs text-muted-foreground">
-              成本 {{ formatPrice(row.costPrice) }} / 持股 {{ formatShares(row.shareCount) }}
+              成本 {{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }} / 持股 {{ formatShares(row.shareCount) }}
             </p>
           </div>
 

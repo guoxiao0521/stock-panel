@@ -4,10 +4,13 @@ import { AlertTriangleIcon, ListPlusIcon } from '@lucide/vue'
 import { onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import MacroMarketSection from '@/components/MacroMarketSection.vue'
+import PortfolioSummaryCards from '@/components/PortfolioSummaryCards.vue'
 import WatchlistTable from '@/components/WatchlistTable.vue'
 import WatchlistToolbar from '@/components/WatchlistToolbar.vue'
+import { calculatePortfolioHoldingSummary } from '@/lib/holding'
 
 const {
+  items,
   filtered,
   search,
   sortKey,
@@ -33,6 +36,8 @@ const { series: indexSeries, load: loadIndices, start: startIndices } = useIntra
 
 const { updatedAt, onRefresh } = useAppHeader()
 const { loggedIn } = useAuthState()
+
+const portfolioSummary = computed(() => calculatePortfolioHoldingSummary(items.value))
 
 interface AddSymbolDialogControls {
   resolve: () => void
@@ -142,6 +147,8 @@ onMounted(async () => {
         管理你的美股关注列表，查看最新价、涨跌、估值与交易活跃度。
       </p>
     </div>
+
+    <PortfolioSummaryCards :summary="portfolioSummary" />
 
     <WatchlistToolbar
       v-model:search="search"

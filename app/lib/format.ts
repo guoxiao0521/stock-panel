@@ -3,8 +3,79 @@
 /** 缺失数据统一占位符 */
 export const DASH = '-'
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$',
+  HKD: 'HK$',
+  CNY: '¥',
+  CNH: '¥',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+}
+
 function isMissing(value: number | null | undefined): value is null | undefined {
   return value === null || value === undefined || Number.isNaN(value)
+}
+
+/** ISO 4217 货币代码，如 USD / HKD */
+export function formatCurrencyCode(currency: string | null | undefined): string | null {
+  const code = currency?.trim().toUpperCase()
+  return code || null
+}
+
+/** 常见交易货币符号；未知币种回退为货币代码 */
+export function formatCurrencySymbol(currency: string | null | undefined): string | null {
+  const code = formatCurrencyCode(currency)
+  if (!code)
+    return null
+  return CURRENCY_SYMBOLS[code] ?? code
+}
+
+/** 金额 + 货币符号，可选附带货币代码 */
+export function formatMoney(
+  value: number | null | undefined,
+  currency?: string | null,
+  options?: { showCode?: boolean },
+): string {
+  const formatted = formatPrice(value)
+  if (formatted === DASH)
+    return DASH
+
+  const code = formatCurrencyCode(currency)
+  const symbol = formatCurrencySymbol(currency)
+  const amount = symbol ? `${symbol}${formatted}` : formatted
+
+  if (options?.showCode && code)
+    return `${amount} ${code}`
+
+  return amount
+}
+
+/** 带正负号的金额 + 货币符号，可选附带货币代码 */
+export function formatSignedMoney(
+  value: number | null | undefined,
+  currency?: string | null,
+  options?: { showCode?: boolean },
+): string {
+  const formatted = formatSignedPrice(value)
+  if (formatted === DASH)
+    return DASH
+
+  const code = formatCurrencyCode(currency)
+  const symbol = formatCurrencySymbol(currency)
+  let amount = formatted
+
+  if (symbol) {
+    if (formatted.startsWith('+') || formatted.startsWith('-'))
+      amount = `${formatted[0]}${symbol}${formatted.slice(1)}`
+    else
+      amount = `${symbol}${formatted}`
+  }
+
+  if (options?.showCode && code)
+    return `${amount} ${code}`
+
+  return amount
 }
 
 /** 价格：保留 2 位小数 */

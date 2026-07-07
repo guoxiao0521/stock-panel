@@ -29,3 +29,4 @@ plugins/
 !.env.example
 
 .vercel
+skills-lock.json
