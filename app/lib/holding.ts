@@ -4,6 +4,9 @@ export interface HoldingMetrics {
   marketValue: number | null
   unrealizedPnl: number | null
   unrealizedPnlPercent: number | null
+  breakEvenPrice: number | null
+  requiredRecoveryGainPercent: number | null
+  breakEvenMarketValue: number | null
 }
 
 export interface CurrencyPortfolioSummary {
@@ -43,6 +46,9 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
       marketValue: null,
       unrealizedPnl: null,
       unrealizedPnlPercent: null,
+      breakEvenPrice: null,
+      requiredRecoveryGainPercent: null,
+      breakEvenMarketValue: null,
     }
   }
 
@@ -53,6 +59,9 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
       marketValue,
       unrealizedPnl: null,
       unrealizedPnlPercent: null,
+      breakEvenPrice: null,
+      requiredRecoveryGainPercent: null,
+      breakEvenMarketValue: null,
     }
   }
 
@@ -60,6 +69,9 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
     marketValue,
     unrealizedPnl: (price - costPrice) * shareCount,
     unrealizedPnlPercent: ((price - costPrice) / costPrice) * 100,
+    breakEvenPrice: costPrice,
+    requiredRecoveryGainPercent: Math.max(0, ((costPrice / price) - 1) * 100),
+    breakEvenMarketValue: costPrice * shareCount,
   }
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { WatchlistRow } from '#shared/types'
 import { HISTORY_RANGES } from '#shared/types'
-import { ArrowLeftIcon, SparklesIcon, Trash2Icon, XIcon } from '@lucide/vue'
+import { ArrowLeftIcon, ArrowUpRightIcon, CalculatorIcon, SparklesIcon, Trash2Icon, XIcon } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import PriceChart from '@/components/PriceChart.vue'
@@ -9,6 +9,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import {
   changeColorClass,
   DASH,
@@ -191,6 +199,26 @@ const metrics = computed(() => {
 
 const holdingMetrics = computed(() => calculateHoldingMetrics(row.value))
 
+const hasCompleteHolding = computed(() =>
+  holdingMetrics.value.requiredRecoveryGainPercent != null,
+)
+
+const needsRecovery = computed(() =>
+  (holdingMetrics.value.requiredRecoveryGainPercent ?? 0) > 0,
+)
+
+const recoverySentence = computed(() => {
+  const requiredGain = holdingMetrics.value.requiredRecoveryGainPercent
+  const breakEvenPrice = holdingMetrics.value.breakEvenPrice
+  const currency = resolveHoldingCurrency(row.value)
+
+  if (requiredGain == null || breakEvenPrice == null)
+    return null
+  if (requiredGain === 0)
+    return `当前价格已高于成本价 ${formatMoney(breakEvenPrice, currency)}`
+  return `当前价需上涨 ${formatPercent(requiredGain)} 至 ${formatMoney(breakEvenPrice, currency)} 回本`
+})
+
 const holdingSummary = computed(() => {
   const currency = resolveHoldingCurrency(row.value)
   return [
@@ -334,6 +362,77 @@ const holdingSummary = computed(() => {
                 </p>
               </div>
             </div>
+            <Sheet v-if="hasCompleteHolding">
+              <SheetTrigger as-child>
+                <button
+                  type="button"
+                  class="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <span class="flex min-w-0 items-center gap-2">
+                    <CalculatorIcon class="size-4 shrink-0 text-primary" />
+                    <span class="text-sm font-medium tabular-nums">{{ recoverySentence }}</span>
+                  </span>
+                  <ArrowUpRightIcon class="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              </SheetTrigger>
+              <SheetContent class="w-full overflow-y-auto sm:max-w-md">
+                <SheetHeader class="border-b pr-12">
+                  <SheetTitle>{{ row.symbol }} 回本计算</SheetTitle>
+                  <SheetDescription>
+                    按当前持仓成本与最新行情计算，不包含交易费用和税费。
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div class="space-y-5 px-4 pb-6">
+                  <div class="rounded-md border bg-muted/30 p-4">
+                    <p class="text-sm text-muted-foreground">
+                      {{ needsRecovery ? '距离回本' : '持仓状态' }}
+                    </p>
+                    <p
+                      class="mt-1 text-3xl font-semibold tabular-nums"
+                      :class="needsRecovery ? 'text-emerald-600 dark:text-emerald-500' : 'text-foreground'"
+                    >
+                      {{ needsRecovery ? formatPercent(holdingMetrics.requiredRecoveryGainPercent) : '已高于成本' }}
+                    </p>
+                    <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                      {{ recoverySentence }}
+                    </p>
+                  </div>
+
+                  <dl class="divide-y rounded-md border">
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">当前价格</dt>
+                      <dd class="font-medium tabular-nums">{{ formatMoney(row.quote?.price, resolveHoldingCurrency(row)) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">持仓成本</dt>
+                      <dd class="font-medium tabular-nums">{{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">回本价格</dt>
+                      <dd class="font-medium tabular-nums">{{ formatMoney(holdingMetrics.breakEvenPrice, resolveHoldingCurrency(row)) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">当前浮动盈亏</dt>
+                      <dd class="font-medium tabular-nums" :class="changeColorClass(holdingMetrics.unrealizedPnl)">
+                        {{ formatSignedMoney(holdingMetrics.unrealizedPnl, resolveHoldingCurrency(row)) }}
+                      </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">回本后市值</dt>
+                      <dd class="font-medium tabular-nums">{{ formatMoney(holdingMetrics.breakEvenMarketValue, resolveHoldingCurrency(row)) }}</dd>
+                    </div>
+                  </dl>
+
+                  <Button as-child variant="outline" class="w-full">
+                    <NuxtLink to="/recovery">
+                      打开通用跌幅计算器
+                      <ArrowUpRightIcon class="size-4" />
+                    </NuxtLink>
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
             <p class="text-xs text-muted-foreground">
               成本 {{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }} / 持股 {{ formatShares(row.shareCount) }}
             </p>

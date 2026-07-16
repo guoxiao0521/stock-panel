@@ -40,6 +40,19 @@ function turnover(value: number | null | undefined): string {
     return DASH
   return `${value.toFixed(2)}%`
 }
+
+function holdingMetrics(row: WatchlistRow) {
+  return calculateHoldingMetrics(row)
+}
+
+function recoveryLabel(row: WatchlistRow): string | null {
+  const requiredGain = holdingMetrics(row).requiredRecoveryGainPercent
+  if (requiredGain == null)
+    return null
+  if (requiredGain === 0)
+    return '已高于成本'
+  return `回本需 ${formatPercent(requiredGain)}`
+}
 </script>
 
 <template>
@@ -100,13 +113,23 @@ function turnover(value: number | null | undefined): string {
             {{ formatShares(row.shareCount) }}
           </TableCell>
           <TableCell class="text-right tabular-nums">
-            {{ formatMoney(calculateHoldingMetrics(row).marketValue, resolveHoldingCurrency(row)) }}
+            {{ formatMoney(holdingMetrics(row).marketValue, resolveHoldingCurrency(row)) }}
           </TableCell>
-          <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnl)">
-            {{ formatSignedMoney(calculateHoldingMetrics(row).unrealizedPnl, resolveHoldingCurrency(row)) }}
+          <TableCell class="text-right tabular-nums" :class="changeColorClass(holdingMetrics(row).unrealizedPnl)">
+            {{ formatSignedMoney(holdingMetrics(row).unrealizedPnl, resolveHoldingCurrency(row)) }}
           </TableCell>
-          <TableCell class="text-right tabular-nums" :class="changeColorClass(calculateHoldingMetrics(row).unrealizedPnlPercent)">
-            {{ formatPercent(calculateHoldingMetrics(row).unrealizedPnlPercent) }}
+          <TableCell class="text-right tabular-nums">
+            <div class="flex min-h-10 flex-col items-end justify-center leading-tight">
+              <span :class="changeColorClass(holdingMetrics(row).unrealizedPnlPercent)">
+                {{ formatPercent(holdingMetrics(row).unrealizedPnlPercent) }}
+              </span>
+              <span
+                v-if="recoveryLabel(row)"
+                class="mt-1 text-xs font-medium text-muted-foreground"
+              >
+                {{ recoveryLabel(row) }}
+              </span>
+            </div>
           </TableCell>
           <TableCell class="text-right tabular-nums">
             {{ formatMoney(row.quote?.navPrice, resolveHoldingCurrency(row)) }}
