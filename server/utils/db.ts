@@ -21,6 +21,15 @@ function withDefaultSearchPath(connectionString: string): string {
   }
 }
 
+function requiresSsl(connectionString: string): boolean {
+  try {
+    return new URL(connectionString).hostname.endsWith('.supabase.com')
+  }
+  catch {
+    return false
+  }
+}
+
 export function usePgPool(): Pool {
   if (pool)
     return pool
@@ -32,9 +41,17 @@ export function usePgPool(): Pool {
 
   pool = new Pool({
     connectionString: withDefaultSearchPath(connectionString),
-    max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+    // Supabase transaction pooler already multiplexes connections. Keeping the
+    // local pool small avoids a connection burst when Nuxt loads several APIs.
+    max: Number(process.env.DATABASE_POOL_MAX ?? 2),
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 20_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    ssl: requiresSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
+  })
+  pool.on('error', (error) => {
+    console.error('[postgres] idle client error', error)
   })
   return pool
 }

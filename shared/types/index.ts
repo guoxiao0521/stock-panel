@@ -167,6 +167,60 @@ export interface UpdateWatchlistItemBody {
   sortOrder?: number
 }
 
+// 买卖交易记录与已实现盈亏
+
+export type TradeSide = 'buy' | 'sell'
+
+/** 持久化的单笔交易记录 */
+export interface TradeRecord {
+  id: string
+  watchlistId: string
+  symbol: string
+  side: TradeSide
+  quantity: number
+  price: number
+  fee: number
+  tradedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 带该笔已实现盈亏的交易（买入时 realizedPnl 为 null） */
+export interface TradeWithPnl extends TradeRecord {
+  realizedPnl: number | null
+}
+
+/** 单个 symbol 回放后的持仓与盈亏汇总 */
+export interface TradeSummary {
+  shareCount: number
+  avgCost: number | null
+  realizedPnl: number
+  totalFees: number
+  totalBuyAmount: number
+  totalSellAmount: number
+}
+
+export interface SymbolTradeSummary extends TradeSummary {
+  symbol: string
+}
+
+export interface CreateTradeBody {
+  symbol: string
+  side: TradeSide
+  quantity: number
+  price: number
+  fee?: number
+  /** ISO 日期或日期时间；缺省为当前时间 */
+  tradedAt?: string
+}
+
+export interface TradesResponse {
+  trades: TradeWithPnl[]
+  /** 按 symbol 过滤时返回该 symbol 汇总；未过滤时为 null */
+  summary: TradeSummary | null
+  bySymbol: SymbolTradeSummary[]
+}
+
 // Phase 3：AI 分析契约（映射 finance-skills 方法论，输出统一报告结构）
 
 /** 内置分析 skill，对应 finance-skills 子集 */

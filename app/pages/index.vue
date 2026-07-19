@@ -7,7 +7,7 @@ import MacroMarketSection from '@/components/MacroMarketSection.vue'
 import PortfolioSummaryCards from '@/components/PortfolioSummaryCards.vue'
 import WatchlistTable from '@/components/WatchlistTable.vue'
 import WatchlistToolbar from '@/components/WatchlistToolbar.vue'
-import { calculatePortfolioHoldingSummary } from '@/lib/holding'
+import { calculatePortfolioHoldingSummary, resolveHoldingCurrency } from '@/lib/holding'
 
 const {
   items,
@@ -34,10 +34,22 @@ const {
 
 const { series: indexSeries, load: loadIndices, start: startIndices } = useIntradayIndices()
 
+const { bySymbol, load: loadTrades, resetCache: resetTradesCache } = useTrades()
+
 const { updatedAt, onRefresh } = useAppHeader()
 const { loggedIn } = useAuthState()
 
 const portfolioSummary = computed(() => calculatePortfolioHoldingSummary(items.value))
+
+const realizedPnlByCurrency = computed(() => {
+  const map: Record<string, number> = {}
+  for (const summary of bySymbol.value) {
+    const row = items.value.find(item => item.symbol === summary.symbol)
+    const currency = resolveHoldingCurrency(row)
+    map[currency] = (map[currency] ?? 0) + summary.realizedPnl
+  }
+  return map
+})
 
 interface AddSymbolDialogControls {
   resolve: () => void
@@ -101,7 +113,8 @@ async function onRemove(id: string) {
 
 // 登录态变化时强制重新加载列表（登录→个人列表，退出→默认列表）
 watch(loggedIn, async () => {
-  await load(true)
+  resetTradesCache()
+  await Promise.all([load(true), loadTrades(undefined, true)])
   await refresh(false)
   updatedAt.value = new Date().toISOString()
 })
@@ -122,7 +135,7 @@ onMounted(async () => {
   // 主要指数当日走势：首屏拉取并启动盘中自动轮询
   startIndices()
   // 首屏优先展示缓存，再异步刷新过期行情（PRD 15）
-  await Promise.all([load(), loadMarket()])
+  await Promise.all([load(), loadMarket(), loadTrades(undefined, true)])
   updatedAt.value = new Date().toISOString()
   const [, marketResult] = await Promise.all([refresh(false), refreshMarket(false)])
   updatedAt.value = new Date().toISOString()
@@ -148,7 +161,10 @@ onMounted(async () => {
       </p>
     </div>
 
-    <PortfolioSummaryCards :summary="portfolioSummary" />
+    <PortfolioSummaryCards
+      :summary="portfolioSummary"
+      :realized-pnl-by-currency="realizedPnlByCurrency"
+    />
 
     <WatchlistToolbar
       v-model:search="search"
@@ -156,6 +172,7 @@ onMounted(async () => {
       v-model:sort-direction="sortDirection"
       v-model:auto-refresh="autoRefresh"
       :count="filtered.length"
+      :rows="items"
       :exists="hasSymbol"
       @add="onAdd"
     />

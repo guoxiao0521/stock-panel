@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { WatchlistRow } from '#shared/types'
 import { HISTORY_RANGES } from '#shared/types'
-import { ArrowLeftIcon, ArrowUpRightIcon, CalculatorIcon, SparklesIcon, Trash2Icon, XIcon } from '@lucide/vue'
+import { ArrowLeftIcon, ArrowUpRightIcon, CalculatorIcon, CopyIcon, SparklesIcon, Trash2Icon, XIcon } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import PriceChart from '@/components/PriceChart.vue'
+import TradeRecordSection from '@/components/TradeRecordSection.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useJsonClipboard } from '@/composables/useJsonClipboard'
 import {
   changeColorClass,
   DASH,
@@ -29,6 +31,7 @@ import {
   formatSignedMoney,
 } from '@/lib/format'
 import { calculateHoldingMetrics, resolveHoldingCurrency } from '@/lib/holding'
+import { serializeHolding } from '@/lib/stock-json'
 
 const route = useRoute()
 const symbol = computed(() => String(route.params.symbol ?? '').toUpperCase())
@@ -68,6 +71,14 @@ function goBack() {
 function goToAnalysis() {
   if (row.value)
     navigateTo(`/analysis?symbol=${row.value.symbol}`)
+}
+
+const { copyJson } = useJsonClipboard()
+
+function copyHoldingData() {
+  if (!row.value)
+    return
+  copyJson(serializeHolding(row.value), `已复制 ${row.value.symbol} 数据`)
 }
 
 // 备注 / 标签 / 持仓编辑缓冲区，切换股票时重置
@@ -180,6 +191,10 @@ async function handleRemove() {
   catch (e) {
     toast.error(errMessage(e, '移除失败'))
   }
+}
+
+async function onTradeHoldingChanged() {
+  await load(true)
 }
 
 const metrics = computed(() => {
@@ -309,10 +324,16 @@ const holdingSummary = computed(() => {
             </div>
           </div>
 
-          <Button variant="outline" class="w-full" @click="goToAnalysis">
-            <SparklesIcon class="size-4" />
-            AI 分析
-          </Button>
+          <div class="grid grid-cols-2 gap-2">
+            <Button variant="outline" @click="goToAnalysis">
+              <SparklesIcon class="size-4" />
+              AI 分析
+            </Button>
+            <Button variant="outline" @click="copyHoldingData">
+              <CopyIcon class="size-4" />
+              复制数据
+            </Button>
+          </div>
 
           <Separator />
 
@@ -437,6 +458,16 @@ const holdingSummary = computed(() => {
               成本 {{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }} / 持股 {{ formatShares(row.shareCount) }}
             </p>
           </div>
+
+          <Separator />
+
+          <TradeRecordSection
+            :symbol="row.symbol"
+            :currency="resolveHoldingCurrency(row)"
+            :cost-price="row.costPrice"
+            :share-count="row.shareCount"
+            @holding-changed="onTradeHoldingChanged"
+          />
 
           <Separator />
 

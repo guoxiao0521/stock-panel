@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { SortDirection, SortKey } from '#shared/types'
-import { ArrowDownIcon, ArrowUpIcon, SearchIcon, TimerIcon } from '@lucide/vue'
+import type { SortDirection, SortKey, WatchlistRow } from '#shared/types'
+import { ArrowDownIcon, ArrowUpIcon, CopyIcon, SearchIcon, TimerIcon } from '@lucide/vue'
+import { computed } from 'vue'
 import AddSymbolDialog from '@/components/AddSymbolDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,9 +13,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { SORT_OPTIONS } from '#shared/types'
+import { useJsonClipboard } from '@/composables/useJsonClipboard'
+import { isHeld, serializeHoldingsExport } from '@/lib/stock-json'
 
-defineProps<{
+const props = defineProps<{
   count: number
+  rows: WatchlistRow[]
   exists?: (symbol: string) => boolean
 }>()
 
@@ -32,12 +36,19 @@ const sortKey = defineModel<SortKey>('sortKey', { default: 'manual' })
 const sortDirection = defineModel<SortDirection>('sortDirection', { default: 'desc' })
 const autoRefresh = defineModel<boolean>('autoRefresh', { default: false })
 
+const { copyJson } = useJsonClipboard()
+const heldCount = computed(() => props.rows.filter(isHeld).length)
+
 function toggleDirection() {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
 
 function forwardAdd(symbol: string, controls: AddSymbolDialogControls) {
   emit('add', symbol, controls)
+}
+
+function copyHoldings() {
+  copyJson(serializeHoldingsExport(props.rows), `已复制 ${heldCount.value} 只持仓`)
 }
 </script>
 
@@ -92,6 +103,17 @@ function forwardAdd(symbol: string, controls: AddSymbolDialogControls) {
     <span class="text-sm text-muted-foreground">
       共 {{ count }} 只
     </span>
+
+    <Button
+      variant="outline"
+      size="sm"
+      :disabled="heldCount === 0"
+      title="复制当前持仓数据为 JSON"
+      @click="copyHoldings"
+    >
+      <CopyIcon class="size-4" />
+      <span class="hidden sm:inline">复制持仓</span>
+    </Button>
 
     <div class="ml-auto">
       <AddSymbolDialog :exists="exists" @add="forwardAdd" />
