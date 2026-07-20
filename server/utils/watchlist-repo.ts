@@ -102,11 +102,22 @@ function mapQuote(row: QuoteRow): QuoteSnapshot {
   }
 }
 
-/** 列出列表内的自选股条目（含最近行情快照） */
-export async function listWatchlistRows(watchlistId: string): Promise<WatchlistRow[]> {
+interface ListWatchlistRowsOptions {
+  holdingOnly?: boolean
+}
+
+/** 列出列表内的自选股条目（含最近行情快照），可仅返回持股数大于零的条目 */
+export async function listWatchlistRows(
+  watchlistId: string,
+  options: ListWatchlistRowsOptions = {},
+): Promise<WatchlistRow[]> {
   const { rows: items } = await dbQuery<ItemRow>(
-    `SELECT * FROM stock_panel.watchlist_items WHERE watchlist_id = $1 ORDER BY sort_order ASC, created_at ASC`,
-    [watchlistId],
+    `SELECT *
+     FROM stock_panel.watchlist_items
+     WHERE watchlist_id = $1
+       AND (NOT $2::boolean OR share_count > 0)
+     ORDER BY sort_order ASC, created_at ASC`,
+    [watchlistId, options.holdingOnly === true],
   )
 
   if (items.length === 0)
