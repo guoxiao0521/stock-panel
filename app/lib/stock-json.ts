@@ -11,6 +11,7 @@ export interface HoldingExport {
   shareCount: number | null
   costPrice: number | null
   price: number | null
+  costBasis: number | null
   marketValue: number | null
   unrealizedPnl: number | null
   unrealizedPnlPercent: number | null
@@ -55,6 +56,7 @@ export function serializeHolding(row: WatchlistRow): HoldingExport {
     shareCount: row.shareCount,
     costPrice: row.costPrice,
     price: quote?.price ?? null,
+    costBasis: metrics.costBasis,
     marketValue: metrics.marketValue,
     unrealizedPnl: metrics.unrealizedPnl,
     unrealizedPnlPercent: metrics.unrealizedPnlPercent,

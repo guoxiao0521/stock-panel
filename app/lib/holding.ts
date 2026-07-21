@@ -1,6 +1,7 @@
 import type { WatchlistRow } from '#shared/types'
 
 export interface HoldingMetrics {
+  costBasis: number | null
   marketValue: number | null
   unrealizedPnl: number | null
   unrealizedPnlPercent: number | null
@@ -11,9 +12,11 @@ export interface HoldingMetrics {
 
 export interface CurrencyPortfolioSummary {
   currency: string
+  totalCostBasis: number | null
   totalMarketValue: number | null
   totalUnrealizedPnl: number | null
   totalUnrealizedPnlPercent: number | null
+  costBasisCount: number
   marketValueCount: number
   pnlCount: number
   incompleteCount: number
@@ -38,11 +41,14 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
   const costPrice = row?.costPrice
   const shareCount = row?.shareCount
 
+  const hasCostBasis = isPositive(costPrice) && isPositive(shareCount)
   const hasMarketValue = isPositive(price) && isPositive(shareCount)
-  const hasPnl = hasMarketValue && isPositive(costPrice)
+  const hasPnl = hasMarketValue && hasCostBasis
+  const costBasis = hasCostBasis ? costPrice * shareCount : null
 
   if (!hasMarketValue) {
     return {
+      costBasis,
       marketValue: null,
       unrealizedPnl: null,
       unrealizedPnlPercent: null,
@@ -56,6 +62,7 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
 
   if (!hasPnl) {
     return {
+      costBasis,
       marketValue,
       unrealizedPnl: null,
       unrealizedPnlPercent: null,
@@ -66,12 +73,13 @@ export function calculateHoldingMetrics(row: WatchlistRow | null | undefined): H
   }
 
   return {
+    costBasis,
     marketValue,
     unrealizedPnl: (price - costPrice) * shareCount,
     unrealizedPnlPercent: ((price - costPrice) / costPrice) * 100,
     breakEvenPrice: costPrice,
     requiredRecoveryGainPercent: Math.max(0, ((costPrice / price) - 1) * 100),
-    breakEvenMarketValue: costPrice * shareCount,
+    breakEvenMarketValue: costBasis,
   }
 }
 
@@ -79,6 +87,8 @@ interface CurrencyAccumulator {
   totalMarketValue: number
   totalUnrealizedPnl: number
   totalCostBasis: number
+  pnlCostBasis: number
+  costBasisCount: number
   marketValueCount: number
   pnlCount: number
   incompleteCount: number
@@ -89,6 +99,8 @@ function createAccumulator(): CurrencyAccumulator {
     totalMarketValue: 0,
     totalUnrealizedPnl: 0,
     totalCostBasis: 0,
+    pnlCostBasis: 0,
+    costBasisCount: 0,
     marketValueCount: 0,
     pnlCount: 0,
     incompleteCount: 0,
@@ -98,11 +110,13 @@ function createAccumulator(): CurrencyAccumulator {
 function toCurrencySummary(currency: string, acc: CurrencyAccumulator): CurrencyPortfolioSummary {
   return {
     currency,
+    totalCostBasis: acc.costBasisCount > 0 ? acc.totalCostBasis : null,
     totalMarketValue: acc.marketValueCount > 0 ? acc.totalMarketValue : null,
     totalUnrealizedPnl: acc.pnlCount > 0 ? acc.totalUnrealizedPnl : null,
-    totalUnrealizedPnlPercent: acc.pnlCount > 0 && acc.totalCostBasis > 0
-      ? (acc.totalUnrealizedPnl / acc.totalCostBasis) * 100
+    totalUnrealizedPnlPercent: acc.pnlCount > 0 && acc.pnlCostBasis > 0
+      ? (acc.totalUnrealizedPnl / acc.pnlCostBasis) * 100
       : null,
+    costBasisCount: acc.costBasisCount,
     marketValueCount: acc.marketValueCount,
     pnlCount: acc.pnlCount,
     incompleteCount: acc.incompleteCount,
@@ -120,6 +134,11 @@ export function calculatePortfolioHoldingSummary(rows: WatchlistRow[]): Portfoli
     const hasCostPrice = isPositive(row.costPrice)
     const hasPrice = isPositive(row.quote?.price)
 
+    if (metrics.costBasis != null) {
+      bucket.totalCostBasis += metrics.costBasis
+      bucket.costBasisCount += 1
+    }
+
     if (metrics.marketValue != null) {
       bucket.totalMarketValue += metrics.marketValue
       bucket.marketValueCount += 1
@@ -127,7 +146,7 @@ export function calculatePortfolioHoldingSummary(rows: WatchlistRow[]): Portfoli
 
     if (metrics.unrealizedPnl != null) {
       bucket.totalUnrealizedPnl += metrics.unrealizedPnl
-      bucket.totalCostBasis += row.costPrice! * row.shareCount!
+      bucket.pnlCostBasis += metrics.costBasis!
       bucket.pnlCount += 1
     }
 
@@ -139,11 +158,11 @@ export function calculatePortfolioHoldingSummary(rows: WatchlistRow[]): Portfoli
 
   const byCurrency = [...buckets.entries()]
     .map(([currency, acc]) => toCurrencySummary(currency, acc))
-    .filter(section => section.marketValueCount > 0 || section.pnlCount > 0 || section.incompleteCount > 0)
+    .filter(section => section.costBasisCount > 0 || section.marketValueCount > 0 || section.pnlCount > 0 || section.incompleteCount > 0)
     .sort((a, b) => a.currency.localeCompare(b.currency))
 
   const activeCurrencies = byCurrency.filter(
-    section => section.marketValueCount > 0 || section.pnlCount > 0,
+    section => section.costBasisCount > 0 || section.marketValueCount > 0 || section.pnlCount > 0,
   )
 
   return {

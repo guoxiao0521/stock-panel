@@ -237,6 +237,7 @@ const recoverySentence = computed(() => {
 const holdingSummary = computed(() => {
   const currency = resolveHoldingCurrency(row.value)
   return [
+    { label: '持仓本金', value: formatMoney(holdingMetrics.value.costBasis, currency) },
     { label: '持仓市值', value: formatMoney(holdingMetrics.value.marketValue, currency) },
     {
       label: '浮动盈亏',
@@ -371,7 +372,7 @@ const holdingSummary = computed(() => {
             <p v-if="holdingError" class="text-xs text-destructive">
               {{ holdingError }}
             </p>
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-2">
               <div
                 v-for="m in holdingSummary"
                 :key="m.label"
@@ -426,8 +427,12 @@ const holdingSummary = computed(() => {
                       <dd class="font-medium tabular-nums">{{ formatMoney(row.quote?.price, resolveHoldingCurrency(row)) }}</dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 px-3 py-3">
-                      <dt class="text-sm text-muted-foreground">持仓成本</dt>
+                      <dt class="text-sm text-muted-foreground">每股成本</dt>
                       <dd class="font-medium tabular-nums">{{ formatMoney(row.costPrice, resolveHoldingCurrency(row)) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-3 py-3">
+                      <dt class="text-sm text-muted-foreground">持仓本金</dt>
+                      <dd class="font-medium tabular-nums">{{ formatMoney(holdingMetrics.costBasis, resolveHoldingCurrency(row)) }}</dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 px-3 py-3">
                       <dt class="text-sm text-muted-foreground">回本价格</dt>

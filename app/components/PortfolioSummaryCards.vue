@@ -12,10 +12,12 @@ const props = defineProps<{
 
 interface DisplaySection {
   currency: string
+  totalCostBasis: number | null
   totalMarketValue: number | null
   totalUnrealizedPnl: number | null
   totalUnrealizedPnlPercent: number | null
   totalRealizedPnl: number | null
+  costBasisCount: number
   marketValueCount: number
   pnlCount: number
   incompleteCount: number
@@ -37,10 +39,12 @@ const displaySections = computed<DisplaySection[]>(() => {
       const hasRealized = Object.prototype.hasOwnProperty.call(realized, currency)
       return {
         currency,
+        totalCostBasis: section?.totalCostBasis ?? null,
         totalMarketValue: section?.totalMarketValue ?? null,
         totalUnrealizedPnl: section?.totalUnrealizedPnl ?? null,
         totalUnrealizedPnlPercent: section?.totalUnrealizedPnlPercent ?? null,
         totalRealizedPnl: hasRealized ? realized[currency]! : null,
+        costBasisCount: section?.costBasisCount ?? 0,
         marketValueCount: section?.marketValueCount ?? 0,
         pnlCount: section?.pnlCount ?? 0,
         incompleteCount: section?.incompleteCount ?? 0,
@@ -53,6 +57,12 @@ const isMultiCurrency = computed(() => displaySections.value.length > 1)
 
 function buildCards(section: DisplaySection) {
   return [
+    {
+      label: '持仓本金',
+      value: formatMoney(section.totalCostBasis, section.currency),
+      currencyCode: formatCurrencyCode(section.currency),
+      tone: undefined as number | undefined,
+    },
     {
       label: '总持仓市值',
       value: formatMoney(section.totalMarketValue, section.currency),
@@ -81,14 +91,16 @@ function buildCards(section: DisplaySection) {
 }
 
 function detailText(section: DisplaySection): string {
-  const { marketValueCount, pnlCount, incompleteCount, totalRealizedPnl, hasHoldingData } = section
+  const { costBasisCount, marketValueCount, pnlCount, incompleteCount, totalRealizedPnl, hasHoldingData } = section
   if (!hasHoldingData && totalRealizedPnl != null)
     return '当前无持仓，以下为历史卖出已实现盈亏。'
 
-  if (marketValueCount === 0 && pnlCount === 0 && totalRealizedPnl == null)
+  if (costBasisCount === 0 && marketValueCount === 0 && pnlCount === 0 && totalRealizedPnl == null)
     return '暂无完整持仓数据，可在个股详情页填写成本价与持股数，或录入买卖交易。'
 
   const parts: string[] = []
+  if (costBasisCount > 0)
+    parts.push(`${costBasisCount} 只计入持仓本金`)
   if (marketValueCount > 0)
     parts.push(`${marketValueCount} 只计入总市值`)
   if (pnlCount > 0)
@@ -129,7 +141,7 @@ const hasAnyData = computed(() => displaySections.value.length > 0)
           <Badge variant="outline">{{ section.currency }}</Badge>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <Card
             v-for="card in buildCards(section)"
             :key="`${section.currency}-${card.label}`"
